@@ -1,3 +1,6 @@
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -17,7 +20,7 @@
 #include <fstream>
 #include <iostream>
 
-// CUDA 内核函数：初始化粒子速度和位置
+// CUDA kernel function: initialize particle velocities and positions
 __global__ void initialize_particles(float *rs,
                                      float *vs,
                                      float *speeds,
@@ -26,7 +29,8 @@ __global__ void initialize_particles(float *rs,
                                      int n_particles,
                                      float len_grid,
                                      float temperature,
-                                     float mass) {
+                                     float mass,
+                         unsigned long long *failed_ass) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= n_particles)
     return;
@@ -44,35 +48,37 @@ __global__ void initialize_particles(float *rs,
   vs[idx * 3 + 0] = speeds[idx] * sinf(thetas[idx]) * cosf(phis[idx]);
   vs[idx * 3 + 1] = speeds[idx] * sinf(thetas[idx]) * sinf(phis[idx]);
   vs[idx * 3 + 2] = speeds[idx] * cosf(thetas[idx]);
+
+  *failed_ass = 0;
 }
 
-// CUDA 内核函数：更新粒子位置并处理边界条件
+// CUDA kernel function: update particle positions and handle boundary conditions
 __global__ void update_positions(float *rs, float *vs, float dt, float *pressure, float len_grid) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= N_PARTICLES)
     return;
 
-  // 更新位置
+  // Update positions
   rs[idx * 3 + 0] += vs[idx * 3 + 0] * dt;
   rs[idx * 3 + 1] += vs[idx * 3 + 1] * dt;
   rs[idx * 3 + 2] += vs[idx * 3 + 2] * dt;
 
-  // 处理边界条件
+  // Handle boundary conditions
   for (int i = 0; i < 3; i++) {
     if (rs[idx * 3 + i] < 0) {
       rs[idx * 3 + i] = fmodf(rs[idx * 3 + i], LEN_PER_SIDE) + LEN_PER_SIDE;
       atomicAdd(pressure, -2 * MASS * vs[idx * 3 + i] / 6 / LEN_PER_SIDE / LEN_PER_SIDE / dt);
-      // vs[idx * 3 + i] = -vs[idx * 3 + i];
+  // vs[idx * 3 + i] = -vs[idx * 3 + i];
     }
     if (rs[idx * 3 + i] > LEN_PER_SIDE) {
       rs[idx * 3 + i] = fmodf(rs[idx * 3 + i], LEN_PER_SIDE);
       atomicAdd(pressure, 2 * MASS * vs[idx * 3 + i] / 6 / LEN_PER_SIDE / LEN_PER_SIDE / dt);
-      // vs[idx * 3 + i] = -vs[idx * 3 + i];
+  // vs[idx * 3 + i] = -vs[idx * 3 + i];
     }
   }
 }
 
-// CUDA 内核函数：计算粒子所属的网格
+// CUDA kernel function: compute the grid to which each particle belongs
 __global__ void compute_grid_indices(int *flat_indices, float *rs, int *grid_particle_counts, float len_grid) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= N_PARTICLES)
@@ -102,13 +108,13 @@ __global__ void group_particles(int *grid_particle_counts, int *grid_particle_li
 
   int grid_idx = flat_indices[idx];
 
-  // atomic 操作将粒子加入对应网格
+  // Atomic operation to add particle to corresponding grid
   int insert_idx = atomicAdd(&grid_particle_counts[grid_idx], 1);
   if (insert_idx < MAX_PARTICLES_PER_GRID) {
     grid_particle_list[grid_idx * MAX_PARTICLES_PER_GRID + insert_idx] = idx;
   } else {
     printf("Grid %d is full! insert_idx=%d\n", grid_idx, insert_idx);
-    cudaError(cudaGetLastError());
+    // cudaError(cudaGetLastError());
   }
 }
 
@@ -121,7 +127,7 @@ __device__ unsigned int xorshift32(unsigned int &state) {
 
 __global__ void
 shuffle_particles_kernel(int *grid_particle_list, const int *grid_particle_counts, const int L, unsigned int seed) {
-  // 三维线程索引对应网格坐标
+  // 3D thread indices correspond to grid coordinates
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
   int k = blockIdx.z * blockDim.z + threadIdx.z;
@@ -129,7 +135,7 @@ shuffle_particles_kernel(int *grid_particle_list, const int *grid_particle_count
   if (i >= L || j >= L || k >= L)
     return;
 
-  // 计算网格的线性索引
+  // Calculate the linear index of the grid
   int grid_idx = i + j * L + k * L * L;
   int count = grid_particle_counts[grid_idx];
   if (count <= 1)
@@ -137,7 +143,7 @@ shuffle_particles_kernel(int *grid_particle_list, const int *grid_particle_count
 
   int *particles = &grid_particle_list[grid_idx * MAX_PARTICLES_PER_GRID];
   unsigned int state = (seed + grid_idx) * 123456789 + 1;
-  // Fisher-Yates洗牌算法
+  // Fisher-Yates shuffle algorithm
   for (int idx = count - 1; idx > 0; --idx) {
     unsigned int rand_val = xorshift32(state) % (idx + 1);
     int temp = particles[idx];
@@ -147,7 +153,7 @@ shuffle_particles_kernel(int *grid_particle_list, const int *grid_particle_count
 }
 
 void shuffle_particles(int *d_grid_particle_list, const int *d_grid_particle_counts, unsigned int seed) {
-  const int threads_per_dim = THREADS_PER_DIM_SHUFFLING; // 每个维度的线程数
+  const int threads_per_dim = THREADS_PER_DIM_SHUFFLING; // Number of threads per dimension
   const int L = N_GRID_PER_SIDE;
   dim3 threads(threads_per_dim, threads_per_dim, threads_per_dim);
   dim3 blocks((L + threads.x - 1) / threads.x, (L + threads.y - 1) / threads.y, (L + threads.z - 1) / threads.z);
@@ -166,19 +172,19 @@ __global__ void scatt_o0(float *rs,
                          float mass,
                          int n_particles) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  int _g = idx / (MAX_PARTICLES_PER_GRID / 2); // 这样可能迫使MAX_PARTICLES_PER_GRID要设为偶数
+  int _g = idx / (MAX_PARTICLES_PER_GRID / 2); // This may force MAX_PARTICLES_PER_GRID to be even
   int _i = idx % (MAX_PARTICLES_PER_GRID / 2);
   int half_grid_size = grid_counts[_g] / 2;
   if (_g >= N_GRID_PER_SIDE * N_GRID_PER_SIDE * N_GRID_PER_SIDE) {
-    printf("idx=%d\n", _g); // for debug
+  printf("idx=%d\n", _g); // for debug
     return;
   }
   if (grid_counts[_g] <= 0) {
-    if (grid_counts[_g] < 0) // for debug
+  if (grid_counts[_g] < 0) // for debug
       printf("grid_counts[%d]=%d\n", _g, grid_counts[_g]);
     return;
   }
-  if (_i >= half_grid_size) // 这样可能过于浪费了
+  if (_i >= half_grid_size) // This may be too wasteful
     return;
   int _p0 = grid_list[_g * MAX_PARTICLES_PER_GRID + _i];
   int _p1 = grid_list[_g * MAX_PARTICLES_PER_GRID + _i + half_grid_size];
@@ -226,7 +232,8 @@ __global__ void scatt_o1(float *rs,
                          float temperature,
                          float mass,
                          int n_particles,
-                         int direction) {
+                         int direction,
+                         unsigned long long *failed_ass) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   int _g0 = idx / (MAX_PARTICLES_PER_GRID / 2);
   int _i0 = idx % (MAX_PARTICLES_PER_GRID / 2);
@@ -259,7 +266,7 @@ __global__ void scatt_o1(float *rs,
     // TODO: how to catch error
     return;
   }
-  if (_i0 >= grid_counts[_g0] || _i1 >= grid_counts[_g1]) // 这样可能过于浪费了
+  if (_i0 >= grid_counts[_g0] || _i1 >= grid_counts[_g1]) // maybe too wasteful
     return;
   int _p0 = grid_list[_g0 * MAX_PARTICLES_PER_GRID + _i0];
   int _p1 = grid_list[_g1 * MAX_PARTICLES_PER_GRID + _i1];
@@ -287,7 +294,9 @@ __global__ void scatt_o1(float *rs,
   float v1y_new = vs[_p1 * 3 + 1] + dy * dot;
   float v1z_new = vs[_p1 * 3 + 2] + dz * dot;
   float dvx_new = v0x_new - v1x_new;
-  assert(v0x_new*v0x_new+v0y_new*v0y_new+v0z_new*v0z_new+v1x_new*v1x_new+v1y_new*v1y_new+v1z_new*v1z_new -vs[_p0 * 3 + 0]*vs[_p0 * 3 + 0]-vs[_p0 * 3 + 1]*vs[_p0 * 3 + 1]-vs[_p0 * 3 + 2]*vs[_p0 * 3 + 2]-vs[_p1 * 3 + 0]*vs[_p1 * 3 + 0]-vs[_p1 * 3 + 1]*vs[_p1 * 3 + 1]-vs[_p1 * 3 + 2]*vs[_p1 * 3 + 2]>0.00001);
+  if (fabs(v0x_new*v0x_new+v0y_new*v0y_new+v0z_new*v0z_new+v1x_new*v1x_new+v1y_new*v1y_new+v1z_new*v1z_new -vs[_p0 * 3 + 0]*vs[_p0 * 3 + 0]-vs[_p0 * 3 + 1]*vs[_p0 * 3 + 1]-vs[_p0 * 3 + 2]*vs[_p0 * 3 + 2]-vs[_p1 * 3 + 0]*vs[_p1 * 3 + 0]-vs[_p1 * 3 + 1]*vs[_p1 * 3 + 1]-vs[_p1 * 3 + 2]*vs[_p1 * 3 + 2]) > 0.00001) {
+    atomicAdd(failed_ass, 1);
+  }
 
   float dvy_new = v0y_new - v1y_new;
   float dvz_new = v0z_new - v1z_new;
@@ -420,7 +429,7 @@ __global__ void scatt_o2(float *rs,
     // TODO: how to catch error
     return;
   }
-  if (_i0 >= grid_counts[_g0] || _i1 >= grid_counts[_g1]) // 这样可能过于浪费了
+  if (_i0 >= grid_counts[_g0] || _i1 >= grid_counts[_g1]) // maybe too wasteful
     return;
   int _p0 = grid_list[_g0 * MAX_PARTICLES_PER_GRID + _i0];
   int _p1 = grid_list[_g1 * MAX_PARTICLES_PER_GRID + _i1];
@@ -541,6 +550,8 @@ int main() {
 
   const int B = BLOCK_SIZE;
   const int G = (N_PARTICLES + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  unsigned long long *failed_ass;
+  cudaMalloc((void **)&failed_ass, sizeof(unsigned long long));
 
   cudaMalloc((void **)&rs, n_particles * 3 * sizeof(float));
   cudaMalloc((void **)&vs, n_particles * 3 * sizeof(float));
@@ -551,8 +562,9 @@ int main() {
   cudaMalloc((void **)&grid_counts, n_grids * sizeof(int));
   cudaMalloc((void **)&grid_list, n_grids * MAX_PARTICLES_PER_GRID * sizeof(int));
   cudaMalloc((void **)&pressures, int(stop / dt) * sizeof(float));
+  cudaMalloc((void **)&failed_ass, sizeof(unsigned long long));
 
-  initialize_particles<<<G, B>>>(rs, vs, speeds, thetas, phis, n_particles, len_grid, T, mass);
+  initialize_particles<<<G, B>>>(rs, vs, speeds, thetas, phis, n_particles, len_grid, T, mass, failed_ass);
   // cudaDeviceSynchronize();
 
   // int *h_grid_list = new int[n_grids * MAX_PARTICLES_PER_GRID];
@@ -589,7 +601,7 @@ int main() {
         shuffle_particles(grid_list, grid_counts, step);
         cudaDeviceSynchronize();
         scatt_o1<<<(n_grids * MAX_PARTICLES_PER_GRID / 2 + B - 1) / B, B>>>(rs, vs, grid_counts, grid_list, d, dt, T,
-                                                                            mass, n_particles, i0);
+                                                                            mass, n_particles, i0, failed_ass);
       // cudaMemcpy(&pressures[step], &temp, sizeof(float), cudaMemcpyHostToDevice);
         // update_positions<<<G, B>>>(rs, vs, 0, &pressures[step], len_grid);
         // compute_grid_indices<<<G, B>>>(flat_indices, rs, grid_counts, len_grid);
@@ -611,6 +623,7 @@ int main() {
       }
     }
   }
+  std::cout << "\nSimulation complete! Saving results..." << std::endl;
   // save rs and vs to file
   std::ofstream rs_file("rs.txt");
   std::ofstream vs_file("vs.txt");
@@ -636,7 +649,11 @@ int main() {
   free(h_rs);
   free(h_vs);
 
-  std::cout << "\nSimulation complete!" << std::endl;
+  unsigned long long *h_failed_ass = (unsigned long long *)malloc(sizeof(unsigned long long));
+  cudaMemcpy(h_failed_ass, failed_ass, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+  std::cout << "Failed assertions: " << *h_failed_ass << std::endl;
 
+  free(h_failed_ass);
+  // cudaFree(failed_ass);
   return 0;
 }

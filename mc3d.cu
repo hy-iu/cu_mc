@@ -1,9 +1,16 @@
 #define PI 3.14159265358979323846
 
-__global__ void update_positions(int* process_counts, int* grid, int* grid_sizes, float *positions, float *velocities, float *pressure, float *offsets, float box_size,
+__global__ void
+// __launch_bounds__(1024, 70)
+update_positions(int* process_counts, int* grid, int* grid_sizes, float *positions, float *velocities, float *pressure, float *offsets, float box_size,
     const int max_grid_size, const float mass, const float dt, const int num_particles, const bool bounded, const bool offset_pos)
 {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    int idx0 = threadIdx.x + blockIdx.x * blockDim.x;
+    int idx1 = threadIdx.y + blockIdx.y * blockDim.y;
+    int idx2 = threadIdx.z + blockIdx.z * blockDim.z;
+    // if (idx0 >= 64 || idx1 >= 64 || idx2 >= 64)
+    //     return;
+    int idx = idx0 + idx1 * 512 + idx2 * 512 * 512;  // TODO
     if (idx < num_particles) {
         atomicAdd(&process_counts[0], 1);
         positions[idx * 3] += velocities[idx * 3] * dt;
