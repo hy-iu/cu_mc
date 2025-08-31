@@ -2,7 +2,8 @@ import numpy as np
 import warp as wp
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-
+import json
+from datetime import datetime
 
 wp.init()
 
@@ -157,142 +158,179 @@ def plot_pos(points, filename):
     plt.savefig(filename)
     plt.close()
 
-point_radius = 0.05
-inv_mass = 1 / 200
-temperature = 1.0
-lower_boundary = wp.vec3(0.0, 0.0, 0.0)
-L = 16.0
-length = wp.vec3(L, L, L)
 
-points = create_particle_volume(131072, lower_boundary, lower_boundary + length)
-speeds = np.sqrt(temperature * inv_mass * 3)
-thetas = np.random.rand(len(points)) * 2.0 * np.pi
-phis = np.arccos(1 - 2 * np.random.rand(len(points)))
-velocities = np.zeros((len(points), 3), dtype=float)
-velocities[:, 0] = speeds * np.sin(phis) * np.cos(thetas)
-velocities[:, 1] = speeds * np.sin(phis) * np.sin(thetas)
-velocities[:, 2] = speeds * np.cos(phis)
-speeds = wp.array(np.ones(len(points), dtype=float) * speeds, dtype=float)
-velocities = wp.array(velocities, dtype=wp.vec3)
+class ParticleSystemConfig:
+    def __init__(self, r=0.05, m=200, T=1.0, L=16.0, L_GRID=32, bx=0.0, by=0.0, bz=0.0):
+        self.point_radius = r
+        self.mass = m
+        self.inv_mass = 1 / m
+        self.temperature = T
+        self.L = L
+        self.L_GRID = L_GRID
+        self.bx = bx
+        self.by = by
+        self.bz = bz
+        self.lower_boundary = wp.vec3(bx, by, bz)
+        self.length = wp.vec3(self.L, self.L, self.L)
 
-forces = wp.empty_like(points)
-bounded_pressures = wp.zeros(len(points), dtype=float)
-grid = wp.HashGrid(32, 32, 32)
-grid_cell_size = 0.5
-sim_dt = 0.005
-sim_t = 100.0
-# plot_pos(points)
-pressure = np.zeros(int(sim_t / sim_dt), dtype=float)
-pooled_pressures = []
-mean_v2 = []
-i = pre_i = 0
-for t in tqdm(np.linspace(0, sim_t, int(sim_t / sim_dt))):
-    grid.build(points, grid_cell_size)
-    wp.launch(
-            kernel=update_boltz,
-            dim=points.shape,
-            inputs=[
-                grid.id,
-                points,
-                velocities,
-                forces,
-                grid_cell_size,
-                grid_cell_size * 2,
-                grid_cell_size * 3,
-                grid_cell_size * 8,
-                sim_dt,
-                point_radius * 2,
-                1
-            ],
-        )
-    wp.launch(
-            kernel=integrate_periodic,
-            dim=points.shape,
-            inputs=[
-                points,
-                velocities,
-                forces,
-                bounded_pressures,
-                (0.0, 0.0, 0.0),
-                sim_dt,
-                inv_mass,
-                lower_boundary,
-                length,
-                wp.vec3(wp.pi, wp.pi, 2.0)
-            ],
-        )
-    pressure[i] = wp.to_torch(bounded_pressures).sum().item() / (length[0] * length[1] * 2 + length[1] * length[2] * 2 + length[2] * length[0] * 2)
-    if t % 1.0 < sim_dt and i > 0:
-        wp.launch(
-            kernel=length_f,
-            dim=points.shape,
-            inputs=[
-                velocities,
-                speeds
-            ],
-        )
-        # v2_torch = wp.to_torch(speeds) ** 2
-        # print('\r', float(v2_torch.mean()), float(v2_torch.min()), float(v2_torch.max()), end='')
-        mean_v2.append((wp.to_torch(speeds) ** 2).mean())
-        pooled_pressures.append(pressure[pre_i:i+1].mean())
-        pre_i = i
-    i += 1
-plot_pos(points, "output/positions.pdf")
-plot_pos(velocities, "output/velocities.pdf")
-hist, bins = np.histogram(speeds.numpy()**2, bins=200)
-bin_widths = np.diff(bins)
-bin_centers = (bins[:-1] + bins[1:]) / 2
-norm_factor = bin_widths * np.sqrt(bin_centers)
-normalized_hist = hist / norm_factor
-plt.yscale('log')
-plt.bar(bin_centers, normalized_hist, width=bin_widths, color='b', alpha=0.5, label='Data')
-plt.savefig("output/dN_per_SqrtE_dE.pdf")
-plt.close()
+    def __str__(self):
+        return json.dumps(self.__dict__, indent=2, default=lambda x: x.tolist() if isinstance(x, wp.vec3) else x)   
 
-x_data = np.linspace(0, sim_t, len(pooled_pressures))
-y_data = np.array(pooled_pressures)
-params = np.polyfit(x_data, y_data, 6)
-w = 30
-fig, axs = plt.subplots(1, 2, figsize=(16, 6))
-# Linear scale
-axs[0].scatter(x_data, y_data, s=1, label='Data')
-axs[0].scatter(x_data[w-1:], np.convolve(y_data, np.ones(w), "valid") / w, s=1, label='Pooled Mean')
-axs[0].set_ylabel('pressure')
-axs[0].legend()
-# Log scale
-axs[1].scatter(x_data, y_data, s=1, label='Data')
-axs[1].scatter(x_data[w-1:], np.convolve(y_data, np.ones(w), "valid") / w, s=1, label='Pooled Mean')
-axs[1].set_yscale('log')
-axs[1].set_ylabel('pressure')
-axs[1].legend()
-plt.tight_layout()
-plt.legend()
-plt.savefig("output/pressure.pdf")
-plt.close()
 
-y_data = np.array([v.cpu() for v in mean_v2])
-fig, axs = plt.subplots(1, 2, figsize=(16, 6))
-axs[0].scatter(x_data, y_data / inv_mass / 2.0, s=1, label='Data')
-axs[0].legend()
-axs[1].scatter(x_data, y_data / inv_mass / 2.0, s=1, label='Data')
-axs[1].set_yscale('log')
-axs[1].legend()
-plt.tight_layout()
-plt.legend()
-plt.savefig("output/mean_energy.pdf")
-plt.close()
+def load_particle_system_config(filename: str) -> ParticleSystemConfig:
+    with open(filename, 'r') as f:
+        data = json.load(f)
+    assert {"point_radius", "mass", "temperature", "L", "L_GRID", "bx", "by", "bz"}.issubset(data.keys())
+    return ParticleSystemConfig(
+        r=data.get("point_radius", 0.05),
+        m=data.get("mass", 200),
+        T=data.get("temperature", 1.0),
+        L=data.get("L", 16.0),
+        L_GRID=data.get("L_GRID", 32),
+        bx=data.get("bx", 0.0),
+        by=data.get("by", 0.0),
+        bz=data.get("bz", 0.0),
+    )
 
-plt.figure(figsize=(16, 12))
-plt.hist(points.numpy()[:, 0], bins=256, histtype='step', alpha=0.5, label='X')
-plt.hist(points.numpy()[:, 1], bins=256, histtype='step', alpha=0.5, label='Y')
-plt.hist(points.numpy()[:, 2], bins=256, histtype='step', alpha=0.5, label='Z')
-plt.grid()
-plt.legend()
-plt.savefig("output/position_histograms.pdf")
-plt.close()
+def my_time_string(end: str = "") -> str:
+    return str(datetime.strftime(datetime.now(), "%Y%m%d_%H%M%S_%f_")) + f"{np.random.randint(0, 999):03d}" + end
 
-plt.figure(figsize=(32, 32))
-plt.scatter(points.numpy()[:, 0], points.numpy()[:, 1], s=0.1, label='X-Y plane')
-plt.scatter(points.numpy()[:, 0], points.numpy()[:, 2], s=0.1, label='X-Z plane')
-plt.legend()
-plt.savefig('points.pdf')
+class ParticleSystem:
+    def __init__(self, c: ParticleSystemConfig):
+        self.config = c
+        self.points = create_particle_volume(131072, c.lower_boundary, c.lower_boundary + c.length)
+        speeds = np.sqrt(c.temperature * c.inv_mass * 3)
+        thetas = np.random.rand(len(self.points)) * 2.0 * np.pi
+        phis = np.arccos(1 - 2 * np.random.rand(len(self.points)))
+        velocities = np.zeros((len(self.points), 3), dtype=float)
+        velocities[:, 0] = speeds * np.sin(phis) * np.cos(thetas)
+        velocities[:, 1] = speeds * np.sin(phis) * np.sin(thetas)
+        velocities[:, 2] = speeds * np.cos(phis)
+        self.speeds = wp.array(np.ones(len(self.points), dtype=float) * speeds, dtype=float)
+        self.velocities = wp.array(velocities, dtype=wp.vec3)
+
+        self.forces = wp.empty_like(self.points)
+        self.bounded_pressures = wp.zeros(len(self.points), dtype=float)
+        self.grid = wp.HashGrid(c.L_GRID, c.L_GRID, c.L_GRID)
+        self.grid_cell_size = c.L / c.L_GRID
+
+    def evolve(self, output_dir=my_time_string(), sim_dt=0.005, sim_t=100.0, c=None):
+        if c is None:
+            c = self.config
+        else:
+            print(f"Warning: using provided config {c}")
+        pressure = np.zeros(int(sim_t / sim_dt), dtype=float)
+        pooled_pressures = []
+        mean_v2 = []
+        i = pre_i = 0
+        for t in tqdm(np.linspace(0, sim_t, int(sim_t / sim_dt))):
+            self.grid.build(self.points, self.grid_cell_size)
+            wp.launch(
+                    kernel=update_boltz,
+                    dim=self.points.shape,
+                    inputs=[
+                        self.grid.id,
+                        self.points,
+                        self.velocities,
+                        self.forces,
+                        self.grid_cell_size,
+                        self.grid_cell_size * 2,
+                        self.grid_cell_size * 3,
+                        self.grid_cell_size * 8,
+                        sim_dt,
+                        c.point_radius * 2,
+                        1
+                    ],
+                )
+            wp.launch(
+                    kernel=integrate_periodic,
+                    dim=self.points.shape,
+                    inputs=[
+                        self.points,
+                        self.velocities,
+                        self.forces,
+                        self.bounded_pressures,
+                        (0.0, 0.0, 0.0),
+                        sim_dt,
+                        c.inv_mass,
+                        c.lower_boundary,
+                        c.length,
+                        wp.vec3(wp.pi, wp.pi, 2.0)
+                    ],
+                )
+            pressure[i] = wp.to_torch(self.bounded_pressures).sum().item() / (c.length[0] * c.length[1] * 2 + c.length[1] * c.length[2] * 2 + c.length[2] * c.length[0] * 2)
+            if t % 1.0 < sim_dt and i > 0:
+                wp.launch(
+                    kernel=length_f,
+                    dim=self.points.shape,
+                    inputs=[
+                        self.velocities,
+                        self.speeds
+                    ],
+                )
+                # v2_torch = wp.to_torch(speeds) ** 2
+                # print('\r', float(v2_torch.mean()), float(v2_torch.min()), float(v2_torch.max()), end='')
+                mean_v2.append((wp.to_torch(self.speeds) ** 2).mean())
+                pooled_pressures.append(pressure[pre_i:i+1].mean())
+                pre_i = i
+            i += 1
+        open(f"output/{output_dir}/config.json", 'w').write(str(c))
+        plot_pos(self.points, f"output/{output_dir}/positions.pdf")
+        plot_pos(self.velocities, f"output/{output_dir}/velocities.pdf")
+        hist, bins = np.histogram(self.speeds.numpy()**2, bins=200)
+        bin_widths = np.diff(bins)
+        bin_centers = (bins[:-1] + bins[1:]) / 2
+        norm_factor = bin_widths * np.sqrt(bin_centers)
+        normalized_hist = hist / norm_factor
+        plt.yscale('log')
+        plt.bar(bin_centers, normalized_hist, width=bin_widths, color='b', alpha=0.5, label='Data')
+        plt.savefig(f"output/{output_dir}/dN_per_SqrtE_dE.pdf")
+        plt.close()
+
+        x_data = np.linspace(0, sim_t, len(pooled_pressures))
+        y_data = np.array(pooled_pressures)
+        params = np.polyfit(x_data, y_data, 6)
+        w = 30
+        fig, axs = plt.subplots(1, 2, figsize=(16, 6))
+        # Linear scale
+        axs[0].scatter(x_data, y_data, s=1, label='Data')
+        axs[0].scatter(x_data[w-1:], np.convolve(y_data, np.ones(w), "valid") / w, s=1, label='Pooled Mean')
+        axs[0].set_ylabel('pressure')
+        axs[0].legend()
+        # Log scale
+        axs[1].scatter(x_data, y_data, s=1, label='Data')
+        axs[1].scatter(x_data[w-1:], np.convolve(y_data, np.ones(w), "valid") / w, s=1, label='Pooled Mean')
+        axs[1].set_yscale('log')
+        axs[1].set_ylabel('pressure')
+        axs[1].legend()
+        plt.tight_layout()
+        plt.legend()
+        plt.savefig(f"output/{output_dir}/pressure.pdf")
+        plt.close()
+
+        y_data = np.array([v.cpu() for v in mean_v2])
+        fig, axs = plt.subplots(1, 2, figsize=(16, 6))
+        axs[0].scatter(x_data, y_data / c.inv_mass / 2.0, s=1, label='Data')
+        axs[0].legend()
+        axs[1].scatter(x_data, y_data / c.inv_mass / 2.0, s=1, label='Data')
+        axs[1].set_yscale('log')
+        axs[1].legend()
+        plt.tight_layout()
+        plt.legend()
+        plt.savefig(f"output/{output_dir}/mean_energy.pdf")
+        plt.close()
+
+        plt.figure(figsize=(16, 12))
+        plt.hist(self.points.numpy()[:, 0], bins=256, histtype='step', alpha=0.5, label='X')
+        plt.hist(self.points.numpy()[:, 1], bins=256, histtype='step', alpha=0.5, label='Y')
+        plt.hist(self.points.numpy()[:, 2], bins=256, histtype='step', alpha=0.5, label='Z')
+        plt.grid()
+        plt.legend()
+        plt.savefig(f"output/{output_dir}/position_histograms.pdf")
+        plt.close()
+
+        plt.figure(figsize=(32, 32))
+        plt.scatter(self.points.numpy()[:, 0], self.points.numpy()[:, 1], s=0.1, label='X-Y plane')
+        plt.scatter(self.points.numpy()[:, 0], self.points.numpy()[:, 2], s=0.1, label='X-Z plane')
+        plt.legend()
+        plt.savefig(f"output/{output_dir}/points.pdf")
