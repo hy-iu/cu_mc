@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import json
 from datetime import datetime
+import os
+import sys
+import shutil
 
 wp.init()
 
@@ -22,6 +25,12 @@ def pow5(x: wp.Float) -> wp.Float:
 @wp.kernel
 def length_f(velocities: wp.array(dtype=wp.vec3), speeds: wp.array(dtype=float)): # pyright: ignore[reportInvalidTypeForm]
     speeds[wp.tid()] = wp.length(velocities[wp.tid()])
+
+@wp.kernel
+def sample_unit_sphere_surface(output: wp.array(dtype=wp.vec3d)):
+    tid = wp.tid()
+    state = wp.rand_init(0, tid)
+    output[tid] = wp.vec3d(wp.sample_unit_sphere_surface(state))
 
 V_MAX = 1e5
 @wp.kernel
@@ -43,7 +52,6 @@ def update_boltz(
     i = wp.hash_grid_point_id(grid, tid)
     x = particle_x[i]
     v = particle_v[i]
-    f = wp.vec3(0.0, 0.0, 0.0)
     neighbors = wp.hash_grid_query(grid, x, dist_o2)
     if n_test == 1:
         collision_prob_o0 = dt * diameter * diameter * wp.pi / pow3(dist_o0)
@@ -64,22 +72,33 @@ def update_boltz(
         dv_dx = wp.dot(dv, dx)
         if d < dist_o0:
             if wp.randf(state) < collision_prob_o0 * dspeed and dv_dx < 0:
-                particle_v[index] += dx * dv_dx / d2
-                particle_v[i] -= dx * dv_dx / d2
+                # particle_v[index] += dx * dv_dx / d2
+                wp.atomic_add(particle_v, index, dx * dv_dx / d2)
+                # particle_v[i] -= dx * dv_dx / d2
+                wp.atomic_add(particle_v, i, - dx * dv_dx / d2)
+                # particle_f[i] = - dx * dv_dx / d2
+                # particle_f[index] = dx * dv_dx / d2
                 break
-                # f = f - dx * wp.max(dv_dx / d2, -V_MAX)
         elif d < dist_o1:
             if wp.randf(state) < - dv_dx / d * collision_prob_o1:
-                particle_v[index] += dx * dv_dx / d2
-                particle_v[i] -= dx * dv_dx / d2
-                break
+                # particle_v[index] += dx * dv_dx / d2
+                wp.atomic_add(particle_v, index, dx * dv_dx / d2)
+                # particle_v[i] -= dx * dv_dx / d2
+                wp.atomic_add(particle_v, i, - dx * dv_dx / d2)
                 # f = f - dx * wp.max(dv_dx / d2, -V_MAX)
+                # particle_f[i] = - dx * dv_dx / d2
+                # particle_f[index] = dx * dv_dx / d2
+                break
         elif d < dist_o2:
             if wp.randf(state) < - dv_dx * dv_dx / d2 / dspeed * collision_prob_o2:
-                particle_v[index] += dx * dv_dx / d2
-                particle_v[i] -= dx * dv_dx / d2
+                # particle_v[index] += dx * dv_dx / d2
+                wp.atomic_add(particle_v, index, dx * dv_dx / d2)
+                # particle_v[i] -= dx * dv_dx / d2
+                wp.atomic_add(particle_v, i, - dx * dv_dx / d2)
+                # f = f - dx * wp.max(dv_dx / d2, -V_MAX)
+                # particle_f[i] = - dx * dv_dx / d2
+                # particle_f[index] = dx * dv_dx / d2
                 break
-    particle_f[i] = f
 
 @wp.kernel
 def integrate_periodic(         # Apply periodic boundary conditions
@@ -123,7 +142,7 @@ def integrate_bounce(
 ):
     tid = wp.tid()
     # v[tid] += f[tid] * inv_mass * dt + gravity * dt
-    v[tid] += f[tid]
+    # v[tid] += f[tid]
     x[tid] += v[tid] * dt
     p[tid] = 0.0
     for i in range(3):
@@ -160,7 +179,7 @@ def plot_pos(points, filename):
 
 
 class ParticleSystemConfig:
-    def __init__(self, r=0.05, m=200, T=1.0, L=16.0, L_GRID=32, bx=0.0, by=0.0, bz=0.0):
+    def __init__(self, r=0.05, m=200, T=1.0, L=16.0, L_GRID=32, bx=-8.0, by=-8.0, bz=-8.0):
         self.point_radius = r
         self.mass = m
         self.inv_mass = 1 / m
@@ -174,7 +193,7 @@ class ParticleSystemConfig:
         self.length = wp.vec3(self.L, self.L, self.L)
 
     def __str__(self):
-        return json.dumps(self.__dict__, indent=2, default=lambda x: x.tolist() if isinstance(x, wp.vec3) else x)   
+        return json.dumps(self.__dict__, indent=2, default=lambda x: list(x) if isinstance(x, wp.vec3) else x)   
 
 
 def load_particle_system_config(filename: str) -> ParticleSystemConfig:
@@ -225,6 +244,7 @@ class ParticleSystem:
         i = pre_i = 0
         for t in tqdm(np.linspace(0, sim_t, int(sim_t / sim_dt))):
             self.grid.build(self.points, self.grid_cell_size)
+            wp.synchronize()
             wp.launch(
                     kernel=update_boltz,
                     dim=self.points.shape,
@@ -242,6 +262,7 @@ class ParticleSystem:
                         1
                     ],
                 )
+            wp.synchronize()
             wp.launch(
                     kernel=integrate_periodic,
                     dim=self.points.shape,
@@ -258,6 +279,23 @@ class ParticleSystem:
                         wp.vec3(wp.pi, wp.pi, 2.0)
                     ],
                 )
+            # wp.launch(
+            #         kernel=integrate_bounce,
+            #         dim=self.points.shape,
+            #         inputs=[
+            #             self.points,
+            #             self.velocities,
+            #             self.forces,
+            #             self.bounded_pressures,
+            #             (0.0, 0.0, 0.0),
+            #             sim_dt,
+            #             c.inv_mass,
+            #             c.lower_boundary,
+            #             c.length,
+            #             # wp.vec3(wp.pi, wp.pi, 2.0)
+            #         ],
+            #     )
+            wp.synchronize()
             pressure[i] = wp.to_torch(self.bounded_pressures).sum().item() / (c.length[0] * c.length[1] * 2 + c.length[1] * c.length[2] * 2 + c.length[2] * c.length[0] * 2)
             if t % 1.0 < sim_dt and i > 0:
                 wp.launch(
@@ -271,12 +309,18 @@ class ParticleSystem:
                 # v2_torch = wp.to_torch(speeds) ** 2
                 # print('\r', float(v2_torch.mean()), float(v2_torch.min()), float(v2_torch.max()), end='')
                 mean_v2.append((wp.to_torch(self.speeds) ** 2).mean())
+                # supply energy
+                self.velocities *= float(np.sqrt(c.temperature * c.inv_mass * 3 / mean_v2[-1].item()))
                 pooled_pressures.append(pressure[pre_i:i+1].mean())
                 pre_i = i
             i += 1
+        os.makedirs(f"output/{output_dir}", exist_ok=False)
+        shutil.copy(os.path.basename(__file__), f"output/{output_dir}/{os.path.basename(__file__)}")
         open(f"output/{output_dir}/config.json", 'w').write(str(c))
-        plot_pos(self.points, f"output/{output_dir}/positions.pdf")
-        plot_pos(self.velocities, f"output/{output_dir}/velocities.pdf")
+        np.save(f"output/{output_dir}/positions.npy", self.points.numpy())
+        np.save(f"output/{output_dir}/velocities.npy", self.velocities.numpy())        
+        # plot_pos(self.points, f"output/{output_dir}/positions.pdf")
+        # plot_pos(self.velocities, f"output/{output_dir}/velocities.pdf")
         hist, bins = np.histogram(self.speeds.numpy()**2, bins=200)
         bin_widths = np.diff(bins)
         bin_centers = (bins[:-1] + bins[1:]) / 2
@@ -289,8 +333,9 @@ class ParticleSystem:
 
         x_data = np.linspace(0, sim_t, len(pooled_pressures))
         y_data = np.array(pooled_pressures)
-        params = np.polyfit(x_data, y_data, 6)
-        w = 30
+        np.save(f"output/{output_dir}/pressure.npy", y_data)
+        # params = np.polyfit(x_data, y_data, 6)
+        w = min(10, int(len(y_data) / 2))
         fig, axs = plt.subplots(1, 2, figsize=(16, 6))
         # Linear scale
         axs[0].scatter(x_data, y_data, s=1, label='Data')
@@ -309,6 +354,7 @@ class ParticleSystem:
         plt.close()
 
         y_data = np.array([v.cpu() for v in mean_v2])
+        np.save(f"output/{output_dir}/mean_v2.npy", y_data)
         fig, axs = plt.subplots(1, 2, figsize=(16, 6))
         axs[0].scatter(x_data, y_data / c.inv_mass / 2.0, s=1, label='Data')
         axs[0].legend()
@@ -329,8 +375,24 @@ class ParticleSystem:
         plt.savefig(f"output/{output_dir}/position_histograms.pdf")
         plt.close()
 
-        plt.figure(figsize=(32, 32))
-        plt.scatter(self.points.numpy()[:, 0], self.points.numpy()[:, 1], s=0.1, label='X-Y plane')
-        plt.scatter(self.points.numpy()[:, 0], self.points.numpy()[:, 2], s=0.1, label='X-Z plane')
+        plt.figure(figsize=(16, 12))
+        plt.hist(self.velocities.numpy()[:, 0], bins=256, histtype='step', alpha=0.5, label='VX')
+        plt.hist(self.velocities.numpy()[:, 1], bins=256, histtype='step', alpha=0.5, label='VY')
+        plt.hist(self.velocities.numpy()[:, 2], bins=256, histtype='step', alpha=0.5, label='VZ')
+        plt.grid()
         plt.legend()
-        plt.savefig(f"output/{output_dir}/points.pdf")
+        plt.savefig(f"output/{output_dir}/velocity_histograms.pdf")
+        plt.close()
+
+        # plt.figure(figsize=(32, 32))
+        # plt.scatter(self.points.numpy()[:, 0], self.points.numpy()[:, 1], s=0.1, label='X-Y plane')
+        # plt.scatter(self.points.numpy()[:, 0], self.points.numpy()[:, 2], s=0.1, label='X-Z plane')
+        # plt.legend()
+        # plt.savefig(f"output/{output_dir}/points.pdf")
+
+if __name__ == "__main__":
+    arg_r = float(sys.argv[1]) if len(sys.argv) > 1 else 0.05
+    print(f"Using point radius {arg_r}")
+    c = ParticleSystemConfig(r=arg_r)
+    ps = ParticleSystem(c)
+    ps.evolve(output_dir=my_time_string('r'+str(arg_r)), sim_dt=0.005 * 0.05 / arg_r, sim_t=20.0 / arg_r)
