@@ -45,11 +45,10 @@ def update_boltz(
     dist_potential_cut: float,
     dt: float,
     diameter: float,
-    n_test: int,
-    seed: int
+    n_test: int
 ):
     tid = wp.tid()
-    state = wp.rand_init(seed, tid)
+    state = wp.rand_init(42, tid)
     i = wp.hash_grid_point_id(grid, tid)
     x = particle_x[i]
     v = particle_v[i]
@@ -67,40 +66,26 @@ def update_boltz(
             continue
         dx = x - particle_x[index]
         dv = v - particle_v[index]
+        d = wp.length(dx)
+        d2 = wp.length_sq(dx)
+        dspeed = wp.length(dv)
         dv_dx = wp.dot(dv, dx)
-        if dv_dx < 0:
-            d = wp.length(dx)
-            d2 = wp.length_sq(dx)
-            dspeed = wp.length(dv)
-            if d < dist_o0:
-                if wp.randf(state) < collision_prob_o0 * dspeed:
-                    # particle_v[index] += dx * dv_dx / d2
-                    wp.atomic_add(particle_v, index, dx * dv_dx / d2)
-                    # particle_v[i] -= dx * dv_dx / d2
-                    wp.atomic_add(particle_v, i, - dx * dv_dx / d2)
-                    # particle_f[i] = - dx * dv_dx / d2
-                    # particle_f[index] = dx * dv_dx / d2
-                    break
-            elif d < dist_o1:
-                if wp.randf(state) < - dv_dx / d * collision_prob_o1:
-                    # particle_v[index] += dx * dv_dx / d2
-                    wp.atomic_add(particle_v, index, dx * dv_dx / d2)
-                    # particle_v[i] -= dx * dv_dx / d2
-                    wp.atomic_add(particle_v, i, - dx * dv_dx / d2)
-                    # f = f - dx * wp.max(dv_dx / d2, -V_MAX)
-                    # particle_f[i] = - dx * dv_dx / d2
-                    # particle_f[index] = dx * dv_dx / d2
-                    break
-            elif d < dist_o2:
-                if wp.randf(state) < dv_dx * dv_dx / d2 / dspeed * collision_prob_o2:
-                    # particle_v[index] += dx * dv_dx / d2
-                    wp.atomic_add(particle_v, index, dx * dv_dx / d2)
-                    # particle_v[i] -= dx * dv_dx / d2
-                    wp.atomic_add(particle_v, i, - dx * dv_dx / d2)
-                    # f = f - dx * wp.max(dv_dx / d2, -V_MAX)
-                    # particle_f[i] = - dx * dv_dx / d2
-                    # particle_f[index] = dx * dv_dx / d2
-                    break
+        if d < dist_o0:
+            if wp.randf(state) < collision_prob_o0 * dspeed and dv_dx < 0:
+                wp.atomic_add(particle_v, index, dx * dv_dx / d2)
+                wp.atomic_add(particle_v, i, - dx * dv_dx / d2)
+                break
+        elif d < dist_o1:
+            if wp.randf(state) < - dv_dx / d * collision_prob_o1:
+                wp.atomic_add(particle_v, index, dx * dv_dx / d2)
+                wp.atomic_add(particle_v, i, - dx * dv_dx / d2)
+                break
+        elif d < dist_o2:
+            if wp.randf(state) < dv_dx * dv_dx / d2 / dspeed * collision_prob_o2 and dv_dx < 0:
+                wp.atomic_add(particle_v, index, dx * dv_dx / d2)
+                wp.atomic_add(particle_v, i, - dx * dv_dx / d2)
+                break
+    neighbors = wp.hash_grid_query(grid, x, dist_potential_cut)
 
 @wp.kernel
 def integrate_periodic(         # Apply periodic boundary conditions
@@ -108,7 +93,7 @@ def integrate_periodic(         # Apply periodic boundary conditions
     v: wp.array(dtype=wp.vec3), # pyright: ignore[reportInvalidTypeForm]
     f: wp.array(dtype=wp.vec3), # pyright: ignore[reportInvalidTypeForm]
     p: wp.array(dtype=float),   # pyright: ignore[reportInvalidTypeForm]
-    gravity: wp.vec3,
+    gravity: wp.vec3,           # not used
     dt: float,
     inv_mass: float,
     lower: wp.vec3,
@@ -116,6 +101,8 @@ def integrate_periodic(         # Apply periodic boundary conditions
     offset: wp.vec3
 ):
     tid = wp.tid()
+    v[tid] += f[tid] * inv_mass * dt
+    v[tid] += f[tid]
     x[tid] += v[tid] * dt
     p[tid] = 0.0
     dx = x[tid] - lower
@@ -134,13 +121,15 @@ def integrate_bounce(
     v: wp.array(dtype=wp.vec3), # pyright: ignore[reportInvalidTypeForm]
     f: wp.array(dtype=wp.vec3), # pyright: ignore[reportInvalidTypeForm]
     p: wp.array(dtype=float),   # pyright: ignore[reportInvalidTypeForm]
-    gravity: wp.vec3,
+    gravity: wp.vec3,           # not used
     dt: float,
     inv_mass: float,
     lower: wp.vec3,
     length: wp.vec3
 ):
     tid = wp.tid()
+    v[tid] += f[tid] * inv_mass * dt
+    # v[tid] += f[tid]
     x[tid] += v[tid] * dt
     p[tid] = 0.0
     for i in range(3):
@@ -177,7 +166,8 @@ def plot_pos(points, filename):
 
 
 class ParticleSystemConfig:
-    def __init__(self, r=0.05, m=200, T=1.0, L=16.0, L_GRID=32, bx=-8.0, by=-8.0, bz=-8.0):
+    def __init__(self, N=131072, r=0.05, m=200, T=1.0, L=16.0, L_GRID=32, bx=-8.0, by=-8.0, bz=-8.0):
+        self.num_particles = N
         self.point_radius = r
         self.mass = m
         self.inv_mass = 1 / m
@@ -197,16 +187,17 @@ class ParticleSystemConfig:
 def load_particle_system_config(filename: str) -> ParticleSystemConfig:
     with open(filename, 'r') as f:
         data = json.load(f)
-    assert {"point_radius", "mass", "temperature", "L", "L_GRID", "bx", "by", "bz"}.issubset(data.keys())
+    assert {"num_particles", "point_radius", "mass", "temperature", "L", "L_GRID", "bx", "by", "bz"}.issubset(data.keys())
     return ParticleSystemConfig(
-        r=data.get("point_radius", 0.05),
-        m=data.get("mass", 200),
-        T=data.get("temperature", 1.0),
-        L=data.get("L", 16.0),
-        L_GRID=data.get("L_GRID", 32),
-        bx=data.get("bx", 0.0),
-        by=data.get("by", 0.0),
-        bz=data.get("bz", 0.0),
+        N=data["num_particles"],
+        r=data["point_radius"],
+        m=data["mass"],
+        T=data["temperature"],
+        L=data["L"],
+        L_GRID=data["L_GRID"],
+        bx=data["bx"],
+        by=data["by"],
+        bz=data["bz"],
     )
 
 def my_time_string(end: str = "") -> str:
@@ -215,7 +206,7 @@ def my_time_string(end: str = "") -> str:
 class ParticleSystem:
     def __init__(self, c: ParticleSystemConfig):
         self.config = c
-        self.points = create_particle_volume(131072, c.lower_boundary, c.lower_boundary + c.length)
+        self.points = create_particle_volume(c.num_particles, c.lower_boundary, c.lower_boundary + c.length)
         speeds = np.sqrt(c.temperature * c.inv_mass * 3)
         thetas = np.random.rand(len(self.points)) * 2.0 * np.pi
         phis = np.arccos(1 - 2 * np.random.rand(len(self.points)))
@@ -228,8 +219,14 @@ class ParticleSystem:
 
         self.forces = wp.empty_like(self.points)
         self.bounded_pressures = wp.zeros(len(self.points), dtype=float)
-        self.grid = wp.HashGrid(c.L_GRID, c.L_GRID, c.L_GRID)
-        self.grid_cell_size = c.L / c.L_GRID
+
+        self.num_grids: int = c.L_GRID ** 3
+        self.max_grid_size: int = (c.num_particles // self.num_grids) * 4
+        GridIndex = wp.vec(self.max_grid_size, dtype=wp.int32)
+        self.grid = wp.array(shape=(c.L_GRID, c.L_GRID, c.L_GRID), dtype=GridIndex)
+        self.grid_sizes = wp.zeros((c.L_GRID, c.L_GRID, c.L_GRID), dtype=wp.int32)
+        # self.grid = wp.HashGrid(c.L_GRID, c.L_GRID, c.L_GRID)
+        # self.grid_cell_size = c.L / c.L_GRID
 
     def evolve(self, output_dir=my_time_string(), sim_dt=0.005, sim_t=100.0, c=None):
         if c is None:
@@ -242,6 +239,23 @@ class ParticleSystem:
         i = pre_i = 0
         for t in tqdm(np.linspace(0, sim_t, int(sim_t / sim_dt))):
             self.grid.build(self.points, self.grid_cell_size)
+            wp.synchronize()
+            wp.launch(
+                    kernel=integrate_periodic,
+                    dim=self.points.shape,
+                    inputs=[
+                        self.points,
+                        self.velocities,
+                        self.forces,
+                        self.bounded_pressures,
+                        (0.0, 0.0, 0.0),
+                        sim_dt,
+                        c.inv_mass,
+                        c.lower_boundary,
+                        c.length,
+                        wp.vec3(wp.pi, wp.pi, 2.0)
+                    ],
+                )
             wp.synchronize()
             wp.launch(
                     kernel=update_boltz,
@@ -257,43 +271,9 @@ class ParticleSystem:
                         self.grid_cell_size * 8,
                         sim_dt,
                         c.point_radius * 2,
-                        1,
-                        np.random.randint(0, 999999)
+                        1
                     ],
                 )
-            wp.synchronize()
-            wp.launch(
-                    kernel=integrate_periodic,
-                    dim=self.points.shape,
-                    inputs=[
-                        self.points,
-                        self.velocities,
-                        self.forces,
-                        self.bounded_pressures,
-                        (0.0, 0.0, 0.0),
-                        sim_dt,
-                        c.inv_mass,
-                        c.lower_boundary,
-                        c.length,
-                        wp.vec3(self.grid_cell_size, self.grid_cell_size, self.grid_cell_size)
-                    ],
-                )
-            # wp.launch(
-            #         kernel=integrate_bounce,
-            #         dim=self.points.shape,
-            #         inputs=[
-            #             self.points,
-            #             self.velocities,
-            #             self.forces,
-            #             self.bounded_pressures,
-            #             (0.0, 0.0, 0.0),
-            #             sim_dt,
-            #             c.inv_mass,
-            #             c.lower_boundary,
-            #             c.length,
-            #             # wp.vec3(wp.pi, wp.pi, 2.0)
-            #         ],
-            #     )
             wp.synchronize()
             pressure[i] = wp.to_torch(self.bounded_pressures).sum().item() / (c.length[0] * c.length[1] * 2 + c.length[1] * c.length[2] * 2 + c.length[2] * c.length[0] * 2)
             if t % 1.0 < sim_dt and i > 0:
@@ -309,7 +289,7 @@ class ParticleSystem:
                 # print('\r', float(v2_torch.mean()), float(v2_torch.min()), float(v2_torch.max()), end='')
                 mean_v2.append((wp.to_torch(self.speeds) ** 2).mean())
                 # supply energy
-                self.velocities *= float(np.sqrt(c.temperature * c.inv_mass * 3 / mean_v2[-1].item()))
+                # self.velocities *= float(np.sqrt(c.temperature * c.inv_mass * 3 / mean_v2[-1].item()))
                 pooled_pressures.append(pressure[pre_i:i+1].mean())
                 pre_i = i
             i += 1
@@ -388,12 +368,10 @@ class ParticleSystem:
         plt.scatter(self.points.numpy()[:, 0], self.points.numpy()[:, 2], s=0.1, label='X-Z plane')
         plt.legend()
         plt.savefig(f"output/{output_dir}/points.pdf")
-        plt.close()
 
 if __name__ == "__main__":
-    # arg_r = float(sys.argv[1]) if len(sys.argv) > 1 else 0.05
-    for arg_r in [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]:
-        print(f"Using point radius {arg_r}")
-        c = ParticleSystemConfig(r=arg_r)
-        ps = ParticleSystem(c)
-        ps.evolve(output_dir=my_time_string('r'+str(arg_r)), sim_dt=0.01, sim_t=100.0)
+    arg_r = float(sys.argv[1]) if len(sys.argv) > 1 else 0.05
+    print(f"Using point radius {arg_r}")
+    c = ParticleSystemConfig(r=arg_r)
+    ps = ParticleSystem(c)
+    ps.evolve(output_dir=my_time_string('r'+str(arg_r)), sim_dt=0.005 * 0.05 / arg_r, sim_t=2.0 / arg_r)

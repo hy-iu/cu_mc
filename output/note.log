@@ -1,0 +1,1 @@
+from 20250902_171000, r0.01-r0.1, fix dt, p similarly proportional to 1/(1-kr^3); dt used to be proportional to 1/r, and p was likely proportional to 1/(1-kr^2)
