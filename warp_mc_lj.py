@@ -416,10 +416,10 @@ class ParticleSystem:
 if __name__ == "__main__":
     arg_r = float(sys.argv[1]) if len(sys.argv) > 1 else 0.05
     print(f"Using point radius {arg_r}")
-    c = ParticleSystemConfig(r=arg_r)
+    c = ParticleSystemConfig(r=arg_r, T=2.0)
     ps = ParticleSystem(c)
-    for eps in [0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5]:
+    for eps in [0, 0.5, 1, 1.5, 2]: #, 2.5, 3, 4, 5
         def lj_epsilon_of_t(t):
             return eps
         print(f"Using L-J epsilon {eps}")
-        ps.evolve(output_dir=my_time_string('r'+str(arg_r)), sim_dt=0.01, sim_t=100.0, lj_epsilon_of_t=lj_epsilon_of_t)
+        ps.evolve(output_dir=my_time_string('r'+str(arg_r))+'T'+str(c.temperature), sim_dt=0.01, sim_t=100.0, lj_epsilon_of_t=lj_epsilon_of_t)
