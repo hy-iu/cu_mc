@@ -1,0 +1,98 @@
+output_lj\20250902_194937 - output_lj\20250902_200220 eps:[0, 0.5, 1, 1.5, 2, 3, 5]
+PS C:\Users\hy-wu.DESKTOP-G355NC5\1\B\cu_mc> python .\warp_mc_lj.py 0.1
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+Using point radius 0.1
+N=131072, n=32.00
+Using L-J epsilon 0
+  0%|                                                                                        | 0/10000 [00:00<?, ?it/s]Module __main__ ee5a459 load on device 'cuda:0' took 13.51 ms  (cached)
+  1%|▊                                                                              | 98/10000 [00:03<02:25, 68.16it/s]Module map_mul 111b5fb load on device 'cuda:0' took 0.91 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [02:33<00:00, 65.33it/s]
+Using L-J epsilon 0.5
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:58<00:00, 84.37it/s]
+Using L-J epsilon 1
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:58<00:00, 84.16it/s]
+Using L-J epsilon 1.5
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:58<00:00, 84.55it/s]
+Using L-J epsilon 2
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:49<00:00, 91.02it/s]
+Using L-J epsilon 3
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:55<00:00, 86.33it/s]
+Using L-J epsilon 5
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:56<00:00, 86.12it/s]
+PS C:\Users\hy-wu.DESKTOP-G355NC5\1\B\cu_mc> python .\warp_mc_lj.py 0.1
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+Using point radius 0.1
+N=131072, n=32.00
+Using L-J epsilon 0
+  0%|                                                                                        | 0/10000 [00:00<?, ?it/s]Module __main__ ee5a459 load on device 'cuda:0' took 1.75 ms  (cached)
+  1%|▊                                                                              | 98/10000 [00:03<02:24, 68.45it/s]Module map_mul 111b5fb load on device 'cuda:0' took 1.09 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [02:21<00:00, 70.80it/s] (output_lj\20250902_204825_565360_629r0.1)
+Using L-J epsilon 2.5
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:51<00:00, 89.31it/s] (output_lj\20250902_205052_220499_892r0.1)
+Using L-J epsilon 4
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:55<00:00, 86.80it/s] (output_lj\20250902_205248_985953_764r0.1)
+Using L-J epsilon 6
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:55<00:00, 86.55it/s] (output_lj\20250902_205448_493624_306r0.1)
+Using L-J epsilon 7.5
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:54<00:00, 86.98it/s] (output_lj\20250902_205648_129831_875r0.1)
+Using L-J epsilon 10
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:54<00:00, 87.02it/s] (output_lj\20250902_205847_511715_074r0.1)
+PS C:\Users\hy-wu.DESKTOP-G355NC5\1\B\cu_mc> python .\warp_mc_lj.py 0.1
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+Using point radius 0.1
+N=131072, n=32.00
+Using L-J epsilon 15
+  0%|                                                                                        | 0/10000 [00:00<?, ?it/s]Module __main__ ee5a459 load on device 'cuda:0' took 1.68 ms  (cached)
+  1%|▋                                                                              | 92/10000 [00:02<02:05, 78.86it/s]Module map_mul 111b5fb load on device 'cuda:0' took 0.93 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:53<00:00, 87.97it/s] (output_lj\20250902_213426_700409_314r0.1)
+Using L-J epsilon 20
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:52<00:00, 88.85it/s] (output_lj\20250902_213624_691735_370r0.1)
+
+PS C:\Users\hy-wu.DESKTOP-G355NC5\1\B\cu_mc> python .\warp_mc_lj.py 0.05
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+Using point radius 0.05
+N=131072, n=32.00
+Using L-J epsilon 0
+  0%|                                                                                        | 0/10000 [00:00<?, ?it/s]Module __main__ ee5a459 load on device 'cuda:0' took 1.69 ms  (cached)
+  1%|▊                                                                              | 99/10000 [00:03<02:29, 66.15it/s]Module map_mul 111b5fb load on device 'cuda:0' took 1.29 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [02:21<00:00, 70.80it/s]
+Using L-J epsilon 0.5
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:48<00:00, 92.59it/s]
+Using L-J epsilon 1
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:48<00:00, 92.19it/s]
+Using L-J epsilon 1.5
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:49<00:00, 90.98it/s]
+Using L-J epsilon 2
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:50<00:00, 90.33it/s]
+Using L-J epsilon 2.5
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:57<00:00, 85.46it/s]
+Using L-J epsilon 3
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:54<00:00, 87.65it/s]
+Using L-J epsilon 4
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:50<00:00, 90.47it/s]
+Using L-J epsilon 5
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [01:50<00:00, 90.56it/s] (output_lj\20250902_221032_702019_408r0.05)

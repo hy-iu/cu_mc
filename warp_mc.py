@@ -392,8 +392,9 @@ class ParticleSystem:
 
 if __name__ == "__main__":
     # arg_r = float(sys.argv[1]) if len(sys.argv) > 1 else 0.05
-    for arg_r in [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]:
+    for arg_r in [0.09]:
+    # for arg_r in [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]:
         print(f"Using point radius {arg_r}")
         c = ParticleSystemConfig(r=arg_r)
         ps = ParticleSystem(c)
-        ps.evolve(output_dir=my_time_string('r'+str(arg_r)), sim_dt=0.01, sim_t=100.0)
+        ps.evolve(output_dir=my_time_string('r'+str(arg_r)), sim_dt=0.01, sim_t=1000.0)

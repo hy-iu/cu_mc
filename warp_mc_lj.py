@@ -40,6 +40,8 @@ V_MAX = 1e5
 
 N_LJ_SAMPLE = 1
 
+DATAROOT_DIR = "output_lj"
+
 @wp.kernel
 def update_boltz(
     grid: wp.uint64,
@@ -53,10 +55,11 @@ def update_boltz(
     dt: float,
     diameter: float,
     n_test: int,
-    l_j_epsilon: float
+    l_j_epsilon: float,
+    seed: int
 ):
     tid = wp.tid()
-    state = wp.rand_init(42, tid)
+    state = wp.rand_init(seed, tid)
     i = wp.hash_grid_point_id(grid, tid)
     x = particle_x[i]
     v = particle_v[i]
@@ -75,25 +78,26 @@ def update_boltz(
             continue
         dx = x - particle_x[index]
         dv = v - particle_v[index]
-        d = wp.length(dx)
-        d2 = wp.length_sq(dx)
-        dspeed = wp.length(dv)
         dv_dx = wp.dot(dv, dx)
-        if d < dist_o0:
-            if wp.randf(state) < collision_prob_o0 * dspeed and dv_dx < 0:
-                wp.atomic_add(particle_v, index, dx * dv_dx / d2)
-                wp.atomic_add(particle_v, i, - dx * dv_dx / d2)
-                break
-        elif d < dist_o1:
-            if wp.randf(state) < - dv_dx / d * collision_prob_o1:
-                wp.atomic_add(particle_v, index, dx * dv_dx / d2)
-                wp.atomic_add(particle_v, i, - dx * dv_dx / d2)
-                break
-        elif d < dist_o2:
-            if wp.randf(state) < dv_dx * dv_dx / d2 / dspeed * collision_prob_o2 and dv_dx < 0:
-                wp.atomic_add(particle_v, index, dx * dv_dx / d2)
-                wp.atomic_add(particle_v, i, - dx * dv_dx / d2)
-                break
+        if dv_dx < 0:
+            d = wp.length(dx)
+            d2 = wp.length_sq(dx)
+            dspeed = wp.length(dv)
+            if d < dist_o0:
+                if wp.randf(state) < collision_prob_o0 * dspeed:
+                    wp.atomic_add(particle_v, index, dx * dv_dx / d2)
+                    wp.atomic_add(particle_v, i, - dx * dv_dx / d2)
+                    break
+            elif d < dist_o1:
+                if wp.randf(state) < - dv_dx / d * collision_prob_o1:
+                    wp.atomic_add(particle_v, index, dx * dv_dx / d2)
+                    wp.atomic_add(particle_v, i, - dx * dv_dx / d2)
+                    break
+            elif d < dist_o2:
+                if wp.randf(state) < dv_dx * dv_dx / d2 / dspeed * collision_prob_o2:
+                    wp.atomic_add(particle_v, index, dx * dv_dx / d2)
+                    wp.atomic_add(particle_v, i, - dx * dv_dx / d2)
+                    break
     neighbors = wp.hash_grid_query(grid, x, dist_potential_cut)
     if N_LJ_SAMPLE == 1:
         for index in neighbors:
@@ -110,7 +114,7 @@ def update_boltz(
             if wp.randf(state) < wp.static(1.0 / float(N_LJ_SAMPLE)):
                 dx = x - particle_x[index]
                 d2 = wp.length_sq(dx)
-                if d2 > dist_o0 * dist_o0:
+                if d2 > diameter * diameter:
                     f += 24.0 * l_j_epsilon * (2.0 * pow6(diameter * diameter / d2) - pow3(diameter * diameter / d2)) * dx / d2
     particle_f[i] = f
 
@@ -255,6 +259,9 @@ class ParticleSystem:
         pooled_pressures = []
         mean_v2 = []
         i = pre_i = 0
+        os.makedirs(f"{DATAROOT_DIR}/{output_dir}", exist_ok=False)
+        np.save(f"{DATAROOT_DIR}/{output_dir}/steps.npy", np.linspace(0, sim_t, int(sim_t / sim_dt)))
+        np.save(f"{DATAROOT_DIR}/{output_dir}/l_j_epsilon.npy", lj_epsilon_of_t(np.linspace(0, sim_t, int(sim_t / sim_dt))))
         for t in tqdm(np.linspace(0, sim_t, int(sim_t / sim_dt))):
             self.grid.build(self.points, self.grid_cell_size)
             wp.synchronize()
@@ -273,7 +280,8 @@ class ParticleSystem:
                         sim_dt,
                         c.point_radius * 2,
                         1,
-                        lj_epsilon_of_t(t)
+                        lj_epsilon_of_t(t),
+                        np.random.randint(0, 999999)
                     ],
                 )
             wp.synchronize()
@@ -291,7 +299,7 @@ class ParticleSystem:
                         c.lower_boundary,
                         c.length,
                         # wp.vec3(wp.pi, wp.pi, wp.e)
-                        wp.vec3(2.0, 2.0, 2.0)
+                        wp.vec3(self.grid_cell_size, self.grid_cell_size, self.grid_cell_size)
                     ],
                 )
             # wp.launch(
@@ -329,13 +337,12 @@ class ParticleSystem:
                 pooled_pressures.append(pressure[pre_i:i+1].mean())
                 pre_i = i
             i += 1
-        os.makedirs(f"output_lj/{output_dir}", exist_ok=False)
-        shutil.copy(os.path.basename(__file__), f"output_lj/{output_dir}/{os.path.basename(__file__)}")
-        open(f"output_lj/{output_dir}/config.json", 'w').write(str(c))
-        np.save(f"output_lj/{output_dir}/positions.npy", self.points.numpy())
-        np.save(f"output_lj/{output_dir}/velocities.npy", self.velocities.numpy())        
-        # plot_pos(self.points, f"output_lj/{output_dir}/positions.pdf")
-        # plot_pos(self.velocities, f"output_lj/{output_dir}/velocities.pdf")
+        shutil.copy(os.path.basename(__file__), f"{DATAROOT_DIR}/{output_dir}/{os.path.basename(__file__)}")
+        open(f"{DATAROOT_DIR}/{output_dir}/config.json", 'w').write(str(c))
+        np.save(f"{DATAROOT_DIR}/{output_dir}/positions.npy", self.points.numpy())
+        np.save(f"{DATAROOT_DIR}/{output_dir}/velocities.npy", self.velocities.numpy())
+        # plot_pos(self.points, f"{DATAROOT_DIR}/{output_dir}/positions.pdf")
+        # plot_pos(self.velocities, f"{DATAROOT_DIR}/{output_dir}/velocities.pdf")
         hist, bins = np.histogram(self.speeds.numpy()**2, bins=200)
         bin_widths = np.diff(bins)
         bin_centers = (bins[:-1] + bins[1:]) / 2
@@ -343,12 +350,12 @@ class ParticleSystem:
         normalized_hist = hist / norm_factor
         plt.yscale('log')
         plt.bar(bin_centers, normalized_hist, width=bin_widths, color='b', alpha=0.5, label='Data')
-        plt.savefig(f"output_lj/{output_dir}/dN_per_SqrtE_dE.pdf")
+        plt.savefig(f"{DATAROOT_DIR}/{output_dir}/dN_per_SqrtE_dE.pdf")
         plt.close()
 
         x_data = np.linspace(0, sim_t, len(pooled_pressures))
         y_data = np.array(pooled_pressures)
-        np.save(f"output_lj/{output_dir}/pressure.npy", y_data)
+        np.save(f"{DATAROOT_DIR}/{output_dir}/pressure.npy", y_data)
         # params = np.polyfit(x_data, y_data, 6)
         w = min(10, int(len(y_data) / 2))
         fig, axs = plt.subplots(1, 2, figsize=(16, 6))
@@ -365,11 +372,11 @@ class ParticleSystem:
         axs[1].legend()
         plt.tight_layout()
         plt.legend()
-        plt.savefig(f"output_lj/{output_dir}/pressure.pdf")
+        plt.savefig(f"{DATAROOT_DIR}/{output_dir}/pressure.pdf")
         plt.close()
 
         y_data = np.array([v.cpu() for v in mean_v2])
-        np.save(f"output_lj/{output_dir}/mean_v2.npy", y_data)
+        np.save(f"{DATAROOT_DIR}/{output_dir}/mean_v2.npy", y_data)
         fig, axs = plt.subplots(1, 2, figsize=(16, 6))
         axs[0].scatter(x_data, y_data / c.inv_mass / 2.0, s=1, label='Data')
         axs[0].legend()
@@ -378,7 +385,7 @@ class ParticleSystem:
         axs[1].legend()
         plt.tight_layout()
         plt.legend()
-        plt.savefig(f"output_lj/{output_dir}/mean_energy.pdf")
+        plt.savefig(f"{DATAROOT_DIR}/{output_dir}/mean_energy.pdf")
         plt.close()
 
         plt.figure(figsize=(16, 12))
@@ -387,7 +394,7 @@ class ParticleSystem:
         plt.hist(self.points.numpy()[:, 2], bins=256, histtype='step', alpha=0.5, label='Z')
         plt.grid()
         plt.legend()
-        plt.savefig(f"output_lj/{output_dir}/position_histograms.pdf")
+        plt.savefig(f"{DATAROOT_DIR}/{output_dir}/position_histograms.pdf")
         plt.close()
 
         plt.figure(figsize=(16, 12))
@@ -396,32 +403,23 @@ class ParticleSystem:
         plt.hist(self.velocities.numpy()[:, 2], bins=256, histtype='step', alpha=0.5, label='VZ')
         plt.grid()
         plt.legend()
-        plt.savefig(f"output_lj/{output_dir}/velocity_histograms.pdf")
+        plt.savefig(f"{DATAROOT_DIR}/{output_dir}/velocity_histograms.pdf")
         plt.close()
 
         plt.figure(figsize=(32, 32))
         plt.scatter(self.points.numpy()[:, 0], self.points.numpy()[:, 1], s=0.1, label='X-Y plane')
         plt.scatter(self.points.numpy()[:, 0], self.points.numpy()[:, 2], s=0.1, label='X-Z plane')
         plt.legend()
-        plt.savefig(f"output_lj/{output_dir}/points.pdf")
+        plt.savefig(f"{DATAROOT_DIR}/{output_dir}/points.pdf")
+        plt.close()
 
 if __name__ == "__main__":
     arg_r = float(sys.argv[1]) if len(sys.argv) > 1 else 0.05
     print(f"Using point radius {arg_r}")
     c = ParticleSystemConfig(r=arg_r)
     ps = ParticleSystem(c)
-    def lj_epsilon_of_t(t):
-        # if t < 5.0 / arg_r:
-        #     return 0.01
-        # elif t < 10.0 / arg_r:
-        #     return 0.03
-        # elif t < 15.0 / arg_r:
-        #     return 0.05
-        # elif t < 20.0 / arg_r:
-        #     return 0.07
-        # elif t < 25.0 / arg_r:
-        #     return 0.09
-        # else:
-        #     return 0.1
-        return 0.1
-    ps.evolve(output_dir=my_time_string('r'+str(arg_r)), sim_dt=0.005 * 0.05 / arg_r, sim_t=5.0 / arg_r, lj_epsilon_of_t=lj_epsilon_of_t)
+    for eps in [0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5]:
+        def lj_epsilon_of_t(t):
+            return eps
+        print(f"Using L-J epsilon {eps}")
+        ps.evolve(output_dir=my_time_string('r'+str(arg_r)), sim_dt=0.01, sim_t=100.0, lj_epsilon_of_t=lj_epsilon_of_t)
