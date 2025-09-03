@@ -40,7 +40,7 @@ V_MAX = 1e5
 
 N_LJ_SAMPLE = 1
 
-DATAROOT_DIR = "output_lj"
+DATAROOT_DIR = "output_lj_freeT"
 
 @wp.kernel
 def update_boltz(
@@ -261,7 +261,7 @@ class ParticleSystem:
         i = pre_i = 0
         os.makedirs(f"{DATAROOT_DIR}/{output_dir}", exist_ok=False)
         np.save(f"{DATAROOT_DIR}/{output_dir}/steps.npy", np.linspace(0, sim_t, int(sim_t / sim_dt)))
-        np.save(f"{DATAROOT_DIR}/{output_dir}/l_j_epsilon.npy", lj_epsilon_of_t(np.linspace(0, sim_t, int(sim_t / sim_dt))))
+        np.save(f"{DATAROOT_DIR}/{output_dir}/l_j_epsilon.npy", np.array([lj_epsilon_of_t(t) for t in np.linspace(0, sim_t, int(sim_t / sim_dt))]))
         for t in tqdm(np.linspace(0, sim_t, int(sim_t / sim_dt))):
             self.grid.build(self.points, self.grid_cell_size)
             wp.synchronize()
@@ -320,7 +320,7 @@ class ParticleSystem:
             #     )
             wp.synchronize()
             pressure[i] = wp.to_torch(self.bounded_pressures).sum().item() / (c.length[0] * c.length[1] * 2 + c.length[1] * c.length[2] * 2 + c.length[2] * c.length[0] * 2)
-            if t % 1.0 < sim_dt and i > 0:
+            if t % 0.1 < sim_dt and i > 0:
                 wp.launch(
                     kernel=length_f,
                     dim=self.points.shape,
@@ -333,7 +333,7 @@ class ParticleSystem:
                 # print('\r', float(v2_torch.mean()), float(v2_torch.min()), float(v2_torch.max()), end='')
                 mean_v2.append((wp.to_torch(self.speeds) ** 2).mean())
                 # supply energy
-                self.velocities *= float(np.sqrt(c.temperature * c.inv_mass * 3 / mean_v2[-1].item()))
+                # self.velocities *= float(np.sqrt(c.temperature * c.inv_mass * 3 / mean_v2[-1].item()))
                 pooled_pressures.append(pressure[pre_i:i+1].mean())
                 pre_i = i
             i += 1
@@ -416,10 +416,11 @@ class ParticleSystem:
 if __name__ == "__main__":
     arg_r = float(sys.argv[1]) if len(sys.argv) > 1 else 0.05
     print(f"Using point radius {arg_r}")
-    c = ParticleSystemConfig(r=arg_r, T=2.0)
-    ps = ParticleSystem(c)
-    for eps in [0, 0.5, 1, 1.5, 2]: #, 2.5, 3, 4, 5
+    c = ParticleSystemConfig(r=arg_r, T=1.0)
+    # for eps in [0, 0.1, 0.25, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5]:
+    for eps in [1, 1.5, 2, 2.5, 3, 4, 5]:
+        ps = ParticleSystem(c)
         def lj_epsilon_of_t(t):
             return eps
         print(f"Using L-J epsilon {eps}")
-        ps.evolve(output_dir=my_time_string('r'+str(arg_r))+'T'+str(c.temperature), sim_dt=0.01, sim_t=100.0, lj_epsilon_of_t=lj_epsilon_of_t)
+        ps.evolve(output_dir=my_time_string('r'+str(arg_r))+'T'+str(c.temperature), sim_dt=0.001, sim_t=100.0, lj_epsilon_of_t=lj_epsilon_of_t)
