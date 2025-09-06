@@ -1,0 +1,377 @@
+PS C:\Users\hy-wu.DESKTOP-G355NC5\1\B\cu_mc> 1000/60
+16.6666666666667
+PS C:\Users\hy-wu.DESKTOP-G355NC5\1\B\cu_mc>
+
+
+                                             python .\warp_mc_simpleGrid.py
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+N=131072, n=32.00
+PS C:\Users\hy-wu.DESKTOP-G355NC5\1\B\cu_mc> python .\warp_mc_simpleGrid.py
+>>
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+N=131072, n=32.00
+Module __main__ 1d7135d load on device 'cuda:0' took 14.22 ms  (cached)
+Module map_mul 111b5fb load on device 'cuda:0' took 0.76 ms  (cached)
+  5%|█████▎                                                                                5%|█████▍                                                                                5%|█████▌                                                                                5%|█████▋                                                                                6%|█████▊                                                                                6%|██████                                                                                6%|██████▏                                                                               6%|██████▎                                                                               6%|██████▍                                                                               6%|██████▌                                                                               6%|██████▋                                                                               7%|██████▊                                                                               7%|██████▉                                                                               7%|███████                                                                               7%|███████▏                                                                              7%|███████▍                                                                              7%|███████▌                                                                              7%|███████▋                                                                                                 | 3651/50000 [00100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 50000/50000 [01:18<00:00, 636.11it/s] 
+PS C:\Users\hy-wu.DESKTOP-G355NC5\1\B\cu_mc>
+
+                                             python
+Python 3.12.7 (tags/v3.12.7:0b05ead, Oct  1 2024, 03:06:41) [MSC v.1941 64 bit (AMD64)] on win32
+Type "help", "copyright", "credits" or "license" for more information.
+>>> os.system('111/5')
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+NameError: name 'os' is not defined. Did you forget to import 'os'?
+>>> import os
+>>> os.system('111/5')
+'111' 不是内部或外部命令，也不是可运行的程序
+或批处理文件。
+1
+>>> os.system('ls',)   
+'ls' 不是内部或外部命令，也不是可运行的程序
+或批处理文件。
+1
+>>> os.system('dir',)
+ 驱动器 C 中的卷没有标签。
+ 卷的序列号是 A20B-2443
+
+ C:\Users\hy-wu.DESKTOP-G355NC5\1\B\cu_mc 的目录
+
+2025/09/06  23:00    <DIR>          .
+2025/09/02  22:35    <DIR>          ..
+2025/09/04  00:16                29 .gitignore
+2025/09/01  00:01    <DIR>          .vscode
+2025/08/26  23:29            10,018 cumc.py
+2025/08/27  00:21            10,026 cumc3d.py
+2025/08/26  23:35    <DIR>          mc
+2024/10/10  23:55            23,952 mc.cu
+2025/08/26  23:18               430 mc.h
+2025/08/27  00:51            16,644 mc.ipynb
+2025/08/27  00:21            24,230 mc3d.cu
+2025/08/26  23:19            34,552 mc_single.cu
+2025/09/06  22:44    <DIR>          output
+2025/09/02  23:55    <DIR>          output_lj
+2025/09/03  22:03    <DIR>          output_lj_freeT
+2024/10/10  23:55           134,365 plot.ipynb
+2025/08/31  16:37           232,559 scan_d.ipynb
+2025/09/06  23:00             4,598 scan_s.ipynb
+2025/08/26  21:58            34,422 tests.cu
+2025/09/02  19:39            16,870 warp_mc.py
+2025/09/03  20:14            17,917 warp_mc_lj.py
+2025/09/06  23:00            17,222 warp_mc_simpleGrid.py
+2025/09/06  23:00            17,221 warp_mc_simpleGrid_R0.50.py.tmp
+2025/09/06  22:57    <DIR>          __pycache__
+              16 个文件        595,055 字节
+               8 个目录 52,772,909,056 可用字节
+0
+>>> ^Z
+
+PS C:\Users\hy-wu.DESKTOP-G355NC5\1\B\cu_mc> python .\scan.py
+Running RADIUS=0.05
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.05, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768    
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=50.0
+N=131072, n=32.00
+ 28%|████████████████████████████▉                                                        28%|█████████████████████████████                                                        28%|█████████████████████████████▏                                                       28%|█████████████████████████████▎                                                       28%|█████████████████████████████▍                                                       28%|█████████████████████████████▌                                                       29%|█████████████████████████████▋                                                       28%|████████████████████████████▉                                                        28%|█████████████████████████████                                                        28%|█████████████████████████████▏                                                       28%|█████████████████████████████▎                                                       28%|█████████████████████████████▍                                                       28%|█████████████████████████████▌                                                       29%|█████████████████████████████▋                                                       29%|█████████████████████████████▊                                                       29%|█████████████████████████████▉                                                       29%|██████████████████████████████▏                                                      29%|██████████████████████████████▎                                                      29%|██████████████████████████████▍  30%|██████████████████████████████▊                                                                 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 50000/50000 [01:22<00:00, 607.39it/s]
+Running RADIUS=0.06
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.06, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=50.0
+N=131072, n=32.00
+Module __main__ ba62aed load on device 'cuda:0' took 2794.56 ms  (compiled)
+Module map_mul 111b5fb load on device 'cuda:0' took 7.15 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 50000/50000 [01:19<00:00, 628.34it/s] 
+PS C:\Users\hy-wu.DESKTOP-G355NC5\1\B\cu_mc> rm *.tmp
+PS C:\Users\hy-wu.DESKTOP-G355NC5\1\B\cu_mc> python .\scan.py
+Running RADIUS=0.01
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.01, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=50.0
+N=131072, n=32.00
+Module __main__ 0fc9e34 load on device 'cuda:0' took 2826.87 ms  (compiled)
+Module map_mul 111b5fb load on device 'cuda:0' took 8.84 ms  (cached)
+100%|████████████████████████████████████████████| 50000/50000 [01:21<00:00, 611.26it/s]
+Running RADIUS=0.02
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.02, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=50.0
+N=131072, n=32.00
+Module __main__ c45ba5a load on device 'cuda:0' took 2761.57 ms  (compiled)
+Module map_mul 111b5fb load on device 'cuda:0' took 8.28 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 50000/50000 [01:22<00:00, 608.89it/s]
+Running RADIUS=0.03
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.03, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=50.0
+N=131072, n=32.00
+Module __main__ 630828b load on device 'cuda:0' took 2796.92 ms  (compiled)
+Module map_mul 111b5fb load on device 'cuda:0' took 8.71 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 50000/50000 [01:21<00:00, 611.58it/s]
+Running RADIUS=0.04
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.04, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=50.0
+N=131072, n=32.00
+Module __main__ 7eb238b load on device 'cuda:0' took 2779.28 ms  (compiled)
+Module map_mul 111b5fb load on device 'cuda:0' took 8.38 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 50000/50000 [01:21<00:00, 611.75it/s] 
+Running RADIUS=0.08
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.08, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=50.0
+N=131072, n=32.00
+Module __main__ caa7fae load on device 'cuda:0' took 2802.65 ms  (compiled)
+Module map_mul 111b5fb load on device 'cuda:0' took 8.34 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 50000/50000 [01:19<00:00, 632.55it/s] 
+Running RADIUS=0.09
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.09, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=50.0
+N=131072, n=32.00
+Module __main__ df75abe load on device 'cuda:0' took 2727.00 ms  (compiled)
+Module map_mul 111b5fb load on device 'cuda:0' took 9.04 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 50000/50000 [01:17<00:00, 644.08it/s] 
+Running RADIUS=0.1
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.1, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=50.0
+N=131072, n=32.00
+Module __main__ 72449d4 load on device 'cuda:0' took 2800.42 ms  (compiled)
+Module map_mul 111b5fb load on device 'cuda:0' took 8.30 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 50000/50000 [01:17<00:00, 646.70it/s] 
+PS C:\Users\hy-wu.DESKTOP-G355NC5\1\B\cu_mc> python .\scan.py
+Running RADIUS=0.11
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.11, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=50.0
+N=131072, n=32.00
+Module __main__ 2e0692b load on device 'cuda:0' took 2723.10 ms  (compiled)
+Module map_mul 111b5fb load on device 'cuda:0' took 7.85 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 50000/50000 [01:16<00:00, 656.85it/s] 
+Running RADIUS=0.12
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.12, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=50.0
+N=131072, n=32.00
+Module __main__ 0706ef3 load on device 'cuda:0' took 2795.73 ms  (compiled)
+Module map_mul 111b5fb load on device 'cuda:0' took 9.05 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 50000/50000 [01:15<00:00, 666.11it/s] 
+Running RADIUS=0.13
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.13, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=50.0
+N=131072, n=32.00
+Module __main__ d45a9ff load on device 'cuda:0' took 2795.07 ms  (compiled)
+Module map_mul 111b5fb load on device 'cuda:0' took 8.50 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 50000/50000 [01:14<00:00, 669.78it/s]
+Running RADIUS=0.14
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.14, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=50.0
+N=131072, n=32.00
+Module __main__ bff7abd load on device 'cuda:0' took 2755.97 ms  (compiled)
+Module map_mul 111b5fb load on device 'cuda:0' took 9.53 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 50000/50000 [01:15<00:00, 658.24it/s] 
+Running RADIUS=0.15
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.15, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=50.0
+N=131072, n=32.00
+Module __main__ 84ebb42 load on device 'cuda:0' took 2746.27 ms  (compiled)
+Module map_mul 111b5fb load on device 'cuda:0' took 8.17 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 50000/50000 [01:14<00:00, 669.36it/s] 
+Running RADIUS=0.16
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.16, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=50.0
+N=131072, n=32.00
+Module __main__ e08fa46 load on device 'cuda:0' took 2769.06 ms  (compiled)
+Module map_mul 111b5fb load on device 'cuda:0' took 8.87 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 50000/50000 [01:14<00:00, 668.73it/s]
+Running RADIUS=0.17
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.17, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=50.0
+N=131072, n=32.00
+Module __main__ e58ba30 load on device 'cuda:0' took 2763.44 ms  (compiled)
+Module map_mul 111b5fb load on device 'cuda:0' took 8.53 ms  (cached)
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 50000/50000 [01:15<00:00, 658.50it/s] 
+PS C:\Users\hy-wu.DESKTOP-G355NC5\1\B\cu_mc> python .\scan.py
+Running RADIUS=0.01
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.01, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=200.0
+N=131072, n=32.00
+Module __main__ 0fc9e34 load on device 'cuda:0' took 13.96 ms  (cached)
+Module map_mul 111b5fb load on device 'cuda:0' took 0.79 ms  (cached)
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████| 200000/200000 [05:22<00:00, 620.60it/s] 
+Running RADIUS=0.02
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.02, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=200.0
+N=131072, n=32.00
+Module __main__ c45ba5a load on device 'cuda:0' took 14.05 ms  (cached)
+Module map_mul 111b5fb load on device 'cuda:0' took 0.85 ms  (cached)
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████| 200000/200000 [05:26<00:00, 612.45it/s] 
+Running RADIUS=0.03
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.03, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=200.0
+N=131072, n=32.00
+Module __main__ 630828b load on device 'cuda:0' took 15.07 ms  (cached)
+Module map_mul 111b5fb load on device 'cuda:0' took 1.02 ms  (cached)
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████| 200000/200000 [05:23<00:00, 617.65it/s] 
+Running RADIUS=0.04
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.04, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=200.0
+N=131072, n=32.00
+Module __main__ 7eb238b load on device 'cuda:0' took 17.58 ms  (cached)
+Module map_mul 111b5fb load on device 'cuda:0' took 1.25 ms  (cached)
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████| 200000/200000 [05:22<00:00, 620.47it/s] 
+Running RADIUS=0.05
+Warp 1.8.1 initialized:
+   CUDA Toolkit 12.8, Driver 13.0
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 3090" (24 GiB, sm_86, mempool enabled)
+   Kernel cache:
+     C:\Users\hy-wu.DESKTOP-G355NC5\AppData\Local\NVIDIA\warp\Cache\1.8.1
+RADIUS=0.05, L=16.0, L_GRID=32, GRID_CELL_SIZE=0.5, MAX_GRID_SIZE=16, NUM_GRIDS=32768
+MASS=200, T=1.0, dt=0.001, N_test=1, t_stop=200.0
+N=131072, n=32.00
+Module __main__ 35c5c92 load on device 'cuda:0' took 3.11 ms  (cached)
+Module map_mul 111b5fb load on device 'cuda:0' took 0.84 ms  (cached)
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████| 200000/200000 [05:17<00:00, 629.91it/s] 

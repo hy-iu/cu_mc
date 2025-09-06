@@ -10,6 +10,7 @@ import shutil
 
 N = 131072
 RADIUS = 0.07
+LJ_EPSILON = 1.0
 MASS = 200
 TEMPERATURE = 1.0
 L = 16.0
@@ -29,11 +30,18 @@ MAX_GRID_SIZE = (N // NUM_GRIDS) * 4
 # GridIndex = wp.vec(MAX_GRID_SIZE, dtype=wp.int32)
 
 DT = 0.001
-T_STOP = 200.0
+T_STOP = 50.0
 
 V_MAX = 1e5  # haven't used
 
 wp.init()
+
+@wp.func
+def lj_force(r2: wp.Float) -> wp.Float:
+    inv_r2 = wp.static(4.0 * RADIUS * RADIUS) / r2
+    inv_r6 = inv_r2 * inv_r2 * inv_r2
+    inv_r12 = inv_r6 * inv_r6
+    return 24.0 * LJ_EPSILON * (2.0 * inv_r12 - inv_r6) / r2
 
 @wp.kernel
 def update_periodic(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3), v: wp.array(dtype=wp.vec3), f: wp.array(dtype=wp.vec3), p: wp.array(dtype=float)): # pyright: ignore[reportInvalidTypeForm]
@@ -98,12 +106,15 @@ def scat22_o1(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int3
             dx = x[i] - x[j] + period_offset
             dv = v[i] - v[j]
             dv_dx = wp.dot(dv, dx)
+            d2 = wp.length_sq(dx)
+            f_lj = lj_force(d2) * dx * 0.5
+            wp.atomic_add(f, i, f_lj)
+            wp.atomic_add(f, j, -f_lj)
             if dv_dx > 0.0:
                 continue
             dspeed = wp.length(dv)
             dist = wp.length(dx)
             if wp.randf(state) < dx[direction] / dist * dspeed * wp.static(DT * wp.pi * 4.0 * RADIUS * RADIUS * RADIUS / (GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE) / float(N_TEST)):
-                d2 = wp.length_sq(dx)
                 if dv_dx < 0.0:
                     wp.atomic_add(v, i, - dx * dv_dx / d2)
                     wp.atomic_add(v, j, dx * dv_dx / d2)
@@ -117,11 +128,14 @@ def scat22_o2(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int3
             j = grid[jb * MAX_GRID_SIZE + j0]
             dx = x[i] - x[j] + period_offset
             dv = v[i] - v[j]
+            d2 = wp.length_sq(dx)
+            f_lj = lj_force(d2) * dx * 0.5
+            wp.atomic_add(f, i, f_lj)
+            wp.atomic_add(f, j, -f_lj)
             dv_dx = wp.dot(dv, dx)
             if dv_dx > 0.0:
                 continue
             dspeed = wp.length(dv)
-            d2 = wp.length_sq(dx)
             if wp.randf(state) < dx[direction1] * dx[direction2] / d2 * dspeed * wp.static(DT * wp.pi * 2.0 * RADIUS * RADIUS * RADIUS * RADIUS / (GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE) / float(N_TEST)):
                 if dv_dx < 0.0:
                     wp.atomic_add(v, i, - dx * dv_dx / d2)
@@ -135,11 +149,15 @@ def update_collisions(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype
         i = grid[gid * MAX_GRID_SIZE + i0]
         for j0 in range(i0 + 1, grid_sizes[gid]):
             j = grid[gid * MAX_GRID_SIZE + j0]
+            dx = x[i] - x[j]
+            d2 = wp.length_sq(dx)
+            if d2 > wp.static(4.0 * RADIUS * RADIUS):
+                f_lj = lj_force(d2) * dx
+                wp.atomic_add(f, i, f_lj)
+                wp.atomic_add(f, j, -f_lj)
             dv = v[i] - v[j]
             dspeed = wp.length(dv)
             if wp.randf(state) < dspeed * wp.static(DT * wp.pi * 4.0 * RADIUS * RADIUS / (GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE) / float(N_TEST)):
-                dx = x[i] - x[j]
-                d2 = wp.length_sq(dx)
                 dv_dx = wp.dot(dv, dx)
                 if dv_dx < 0.0:
                     wp.atomic_add(v, i, - dx * dv_dx / d2)
@@ -243,6 +261,7 @@ class ParticleSystem:
         for t in tqdm(np.linspace(0, T_STOP, int(T_STOP / DT))):
             self.grid_sizes.zero_()
             self.grid.zero_()
+            self.forces.zero_()
             wp.synchronize()
             wp.launch(
                     kernel=update_periodic,
