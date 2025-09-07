@@ -9,8 +9,8 @@ import sys
 import shutil
 
 N = 131072
-RADIUS = 0.07
-LJ_EPSILON = 1.0
+RADIUS = 0.05
+LJ_EPSILON = 0.11
 MASS = 200
 TEMPERATURE = 1.0
 L = 16.0
@@ -30,7 +30,7 @@ MAX_GRID_SIZE = (N // NUM_GRIDS) * 4
 # GridIndex = wp.vec(MAX_GRID_SIZE, dtype=wp.int32)
 
 DT = 0.001
-T_STOP = 50.0
+T_STOP = 100.0
 
 V_MAX = 1e5  # haven't used
 D2_MIN = 1e-8
@@ -113,7 +113,7 @@ def scat22_o1(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int3
             if d2 < wp.static(D2_MIN):  # too close, ignore
                 continue
             if d2 > wp.static(4.0 * RADIUS * RADIUS):
-                f_lj = lj_force(d2) * dx
+                f_lj = lj_force(d2) * dx * 0.5
                 wp.atomic_add(f, i, f_lj)
                 wp.atomic_add(f, j, -f_lj)
             if dv_dx > 0.0:
@@ -135,10 +135,8 @@ def scat22_o2(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int3
             dx = x[i] - x[j] + period_offset
             dv = v[i] - v[j]
             d2 = wp.length_sq(dx)
-            if d2 < wp.static(D2_MIN):  # too close, ignore
-                continue
             if d2 > wp.static(4.0 * RADIUS * RADIUS):
-                f_lj = lj_force(d2) * dx
+                f_lj = lj_force(d2) * dx * 0.5
                 wp.atomic_add(f, i, f_lj)
                 wp.atomic_add(f, j, -f_lj)
             dv_dx = wp.dot(dv, dx)
@@ -197,15 +195,6 @@ def update_collisions(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype
     scat22_o2(grid, grid_sizes, x, v, f, seed * 8 + gid, gid, jbx2 * L_GRID * L_GRID + iby * L_GRID + ibz, 0, 0, wp.vec3(xoff2, 0.0, 0.0))
     scat22_o2(grid, grid_sizes, x, v, f, seed * 9 + gid, gid, ibx * L_GRID * L_GRID + jby2 * L_GRID + ibz, 1, 1, wp.vec3(0.0, yoff2, 0.0))
     scat22_o2(grid, grid_sizes, x, v, f, seed * 10 + gid, gid, ibx * L_GRID * L_GRID + iby * L_GRID + jbz2, 2, 2, wp.vec3(0.0, 0.0, zoff2))
-    for i0 in range(grid_sizes[gid]):
-        i = grid[gid * MAX_GRID_SIZE + i0]
-        for j0 in range(grid_sizes[jbx * L_GRID * L_GRID + jby * L_GRID + jbz]):
-            j = grid[(gid + 1 if gid + 1 < NUM_GRIDS else 0) * MAX_GRID_SIZE + j0]
-            # dx = x[i] - x[j] + wp.vec3(-LENGTH[0], 0.0, 0.0) if ibx == L_GRID - 1 else x[i] - x[j]
-            # TODO
-            d2 = wp.length_sq(dx)
-            if d2 > wp.static(4.0 * RADIUS * RADIUS):
-                continue
 
 @wp.func
 def pow3(x: wp.Float) -> wp.Float:
