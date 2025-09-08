@@ -10,7 +10,7 @@ import shutil
 
 N = 131072
 RADIUS = 0.07
-LJ_EPSILON = 1.0
+LJ_EPSILON = 0.05
 MASS = 200
 TEMPERATURE = 1.0
 L = 16.0
@@ -64,6 +64,9 @@ def update_periodic(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=w
     i = wp.int(wp.floordiv(x[pid][0] - LOWER_BOUNDARY[0], GRID_CELL_SIZE))
     j = wp.int(wp.floordiv(x[pid][1] - LOWER_BOUNDARY[1], GRID_CELL_SIZE))
     k = wp.int(wp.floordiv(x[pid][2] - LOWER_BOUNDARY[2], GRID_CELL_SIZE))
+    i = wp.min(wp.max(i, 0), L_GRID - 1)
+    j = wp.min(wp.max(j, 0), L_GRID - 1)
+    k = wp.min(wp.max(k, 0), L_GRID - 1)
     gid = i * L_GRID * L_GRID + j * L_GRID + k
     subid = wp.atomic_add(grid_sizes, gid, 1)
     grid[gid * MAX_GRID_SIZE + subid] = pid
@@ -179,18 +182,18 @@ def update_collisions(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype
     jbx = ibx - 1 if ibx > 0 else L_GRID - 1
     jby = iby - 1 if iby > 0 else L_GRID - 1
     jbz = ibz - 1 if ibz > 0 else L_GRID - 1
-    xoff = 0.0 if ibx > 0 else -LENGTH[0]
-    yoff = 0.0 if iby > 0 else -LENGTH[1]
-    zoff = 0.0 if ibz > 0 else -LENGTH[2]
+    xoff = 0.0 if ibx > 0 else LENGTH[0]
+    yoff = 0.0 if iby > 0 else LENGTH[1]
+    zoff = 0.0 if ibz > 0 else LENGTH[2]
     scat22_o1(grid, grid_sizes, x, v, f, seed * 2 + gid, gid, jbx * L_GRID * L_GRID + iby * L_GRID + ibz, 0, wp.vec3(xoff, 0.0, 0.0))
     scat22_o1(grid, grid_sizes, x, v, f, seed * 3 + gid, gid, ibx * L_GRID * L_GRID + jby * L_GRID + ibz, 1, wp.vec3(0.0, yoff, 0.0))
     scat22_o1(grid, grid_sizes, x, v, f, seed * 4 + gid, gid, ibx * L_GRID * L_GRID + iby * L_GRID + jbz, 2, wp.vec3(0.0, 0.0, zoff))
     jbx2 = ibx - 2 if ibx > 1 else L_GRID - 1
     jby2 = iby - 2 if iby > 1 else L_GRID - 1
     jbz2 = ibz - 2 if ibz > 1 else L_GRID - 1
-    xoff2 = 0.0 if ibx > 1 else -LENGTH[0]
-    yoff2 = 0.0 if iby > 1 else -LENGTH[1]
-    zoff2 = 0.0 if ibz > 1 else -LENGTH[2]
+    xoff2 = 0.0 if ibx > 1 else LENGTH[0]
+    yoff2 = 0.0 if iby > 1 else LENGTH[1]
+    zoff2 = 0.0 if ibz > 1 else LENGTH[2]
     scat22_o2(grid, grid_sizes, x, v, f, seed * 5 + gid, gid, jbx * L_GRID * L_GRID + jby * L_GRID + ibz, 0, 1, wp.vec3(xoff, yoff, 0.0))
     scat22_o2(grid, grid_sizes, x, v, f, seed * 6 + gid, gid, jbx * L_GRID * L_GRID + iby * L_GRID + jbz, 0, 2, wp.vec3(xoff, 0.0, zoff))
     scat22_o2(grid, grid_sizes, x, v, f, seed * 7 + gid, gid, ibx * L_GRID * L_GRID + jby * L_GRID + jbz, 1, 2, wp.vec3(0.0, yoff, zoff))
@@ -201,11 +204,12 @@ def update_collisions(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype
         i = grid[gid * MAX_GRID_SIZE + i0]
         for j0 in range(grid_sizes[jbx * L_GRID * L_GRID + jby * L_GRID + jbz]):
             j = grid[(gid + 1 if gid + 1 < NUM_GRIDS else 0) * MAX_GRID_SIZE + j0]
-            # dx = x[i] - x[j] + wp.vec3(-LENGTH[0], 0.0, 0.0) if ibx == L_GRID - 1 else x[i] - x[j]
-            # TODO
+            dx = x[i] - x[j] + wp.vec3(xoff, yoff, zoff)
             d2 = wp.length_sq(dx)
             if d2 > wp.static(4.0 * RADIUS * RADIUS):
-                continue
+                f_lj = lj_force(d2) * dx
+                wp.atomic_add(f, i, f_lj)
+                wp.atomic_add(f, j, -f_lj)
 
 @wp.func
 def pow3(x: wp.Float) -> wp.Float:
