@@ -18,7 +18,7 @@ L_GRID = 32
 BX = -8.0
 BY = -8.0
 BZ = -8.0
-N_TEST = 1
+N_TEST = 10
 
 LOWER_BOUNDARY = wp.vec3(BX, BY, BZ)
 LENGTH = wp.vec3(L, L, L)
@@ -29,13 +29,15 @@ NUM_GRIDS = L_GRID ** 3
 MAX_GRID_SIZE = (N // NUM_GRIDS) * 4
 # GridIndex = wp.vec(MAX_GRID_SIZE, dtype=wp.int32)
 
-DT = 0.001
+DT = 0.01
 T_STOP = 100.0
 
 V_MAX = 1e5  # haven't used
-D2_MIN = 1e-8
+F_MAX = 1e5
+D2_MIN = RADIUS * RADIUS * 0.1
+PERIODOC_MAX = 5
 
-OUTPUT_ROOT = 'output_sg_ljo'
+OUTPUT_ROOT = 'warp_mc_simpleGrid_onlyLJ'
 
 wp.init()
 
@@ -44,7 +46,8 @@ def lj_force(r2: wp.Float) -> wp.Float:
     inv_r2 = wp.static(4.0 * RADIUS * RADIUS) / r2
     inv_r6 = inv_r2 * inv_r2 * inv_r2
     inv_r12 = inv_r6 * inv_r6
-    return 24.0 * LJ_EPSILON * (2.0 * inv_r12 - inv_r6) / r2
+    f = 24.0 * LJ_EPSILON * (2.0 * inv_r12 - inv_r6) / r2
+    return f if f < wp.static(F_MAX) else 0.0
 
 @wp.kernel
 def update_v_half_step(v: wp.array(dtype=wp.vec3), f: wp.array(dtype=wp.vec3)): # pyright: ignore[reportInvalidTypeForm]
@@ -57,7 +60,7 @@ def update_periodic(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=w
     x[pid] += v[pid] * DT
     p[pid] = 0.0
     for i in range(3):
-        while True:
+        for _ in range(PERIODOC_MAX):
             dx = x[pid] - LOWER_BOUNDARY
             if dx[i] > LENGTH[i]:
                 x[pid][i] = LOWER_BOUNDARY[i] + wp.mod(dx[i], LENGTH[i])
@@ -85,7 +88,8 @@ def update_bounce(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.
     p[pid] = 0.0
     dx = x[pid] - LOWER_BOUNDARY
     for i in range(3):
-        while True:
+        # while True:
+        for _ in range(PERIODOC_MAX):
             dx = x[pid] - LOWER_BOUNDARY
             if dx[i] > LENGTH[i]:
                 x[pid][i] = LOWER_BOUNDARY[i] + 2.0 * LENGTH[i] - dx[i]
@@ -116,23 +120,16 @@ def scat22_o1(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int3
         for j0 in range(grid_sizes[jb]):
             j = grid[jb * MAX_GRID_SIZE + j0]
             dx = x[i] - x[j] + period_offset
-            dv = v[i] - v[j]
-            dv_dx = wp.dot(dv, dx)
             d2 = wp.length_sq(dx)
             if d2 < wp.static(D2_MIN):  # too close, ignore
                 continue
-            if d2 > wp.static(4.0 * RADIUS * RADIUS):
-                f_lj = lj_force(d2) * dx
-                wp.atomic_add(f, i, f_lj)
-                wp.atomic_add(f, j, -f_lj)
-            if dv_dx > 0.0:
+            if wp.randf(state) > 1 / N_TEST:
                 continue
-            dspeed = wp.length(dv)
-            dist = wp.length(dx)
-            if wp.randf(state) < dx[direction] / dist * dspeed * wp.static(DT * wp.pi * 4.0 * RADIUS * RADIUS * RADIUS / (GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE) / float(N_TEST)):
-                if dv_dx < 0.0:
-                    wp.atomic_add(v, i, - dx * dv_dx / d2)
-                    wp.atomic_add(v, j, dx * dv_dx / d2)
+            # if d2 > wp.static(4.0 * RADIUS * RADIUS):
+            f_lj = lj_force(d2) * dx
+            wp.atomic_add(f, i, f_lj)
+            wp.atomic_add(f, j, -f_lj)
+
 
 @wp.func
 def scat22_o2(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3), v: wp.array(dtype=wp.vec3), f: wp.array(dtype=wp.vec3), seed: int, ib: int, jb: int, direction1: int, direction2: int, period_offset: wp.vec3): # pyright: ignore[reportInvalidTypeForm]
@@ -142,22 +139,15 @@ def scat22_o2(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int3
         for j0 in range(grid_sizes[jb]):
             j = grid[jb * MAX_GRID_SIZE + j0]
             dx = x[i] - x[j] + period_offset
-            dv = v[i] - v[j]
             d2 = wp.length_sq(dx)
             if d2 < wp.static(D2_MIN):  # too close, ignore
                 continue
-            if d2 > wp.static(4.0 * RADIUS * RADIUS):
-                f_lj = lj_force(d2) * dx
-                wp.atomic_add(f, i, f_lj)
-                wp.atomic_add(f, j, -f_lj)
-            dv_dx = wp.dot(dv, dx)
-            if dv_dx > 0.0:
+            if wp.randf(state) > 1 / N_TEST:
                 continue
-            dspeed = wp.length(dv)
-            if wp.randf(state) < dx[direction1] * dx[direction2] / d2 * dspeed * wp.static(DT * wp.pi * 2.0 * RADIUS * RADIUS * RADIUS * RADIUS / (GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE) / float(N_TEST)):
-                if dv_dx < 0.0:
-                    wp.atomic_add(v, i, - dx * dv_dx / d2)
-                    wp.atomic_add(v, j, dx * dv_dx / d2)
+            # if d2 > wp.static(4.0 * RADIUS * RADIUS):
+            f_lj = lj_force(d2) * dx
+            wp.atomic_add(f, i, f_lj)
+            wp.atomic_add(f, j, -f_lj)
 
 @wp.kernel
 def update_collisions(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3), v: wp.array(dtype=wp.vec3), f: wp.array(dtype=wp.vec3), seed: int): # pyright: ignore[reportInvalidTypeForm]
@@ -171,17 +161,12 @@ def update_collisions(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype
             d2 = wp.length_sq(dx)
             if d2 < wp.static(D2_MIN):  # too close, ignore
                 continue
-            if d2 > wp.static(4.0 * RADIUS * RADIUS):
-                f_lj = lj_force(d2) * dx
-                wp.atomic_add(f, i, f_lj)
-                wp.atomic_add(f, j, -f_lj)
-            dv = v[i] - v[j]
-            dspeed = wp.length(dv)
-            if wp.randf(state) < dspeed * wp.static(DT * wp.pi * 4.0 * RADIUS * RADIUS / (GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE) / float(N_TEST)):
-                dv_dx = wp.dot(dv, dx)
-                if dv_dx < 0.0:
-                    wp.atomic_add(v, i, - dx * dv_dx / d2)
-                    wp.atomic_add(v, j, dx * dv_dx / d2)
+            if wp.randf(state) > 1 / N_TEST:
+                continue
+            # if d2 > wp.static(4.0 * RADIUS * RADIUS):
+            f_lj = lj_force(d2) * dx
+            wp.atomic_add(f, i, f_lj)
+            wp.atomic_add(f, j, -f_lj)
     ibx = gid // (L_GRID * L_GRID)
     iby = gid // L_GRID % L_GRID
     ibz = gid % L_GRID
@@ -212,10 +197,10 @@ def update_collisions(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype
             j = grid[(gid + 1 if gid + 1 < NUM_GRIDS else 0) * MAX_GRID_SIZE + j0]
             dx = x[i] - x[j] + wp.vec3(xoff, yoff, zoff)
             d2 = wp.length_sq(dx)
-            if d2 > wp.static(4.0 * RADIUS * RADIUS):
-                f_lj = lj_force(d2) * dx
-                wp.atomic_add(f, i, f_lj)
-                wp.atomic_add(f, j, -f_lj)
+            # if d2 > wp.static(4.0 * RADIUS * RADIUS):
+            f_lj = lj_force(d2) * dx
+            wp.atomic_add(f, i, f_lj)
+            wp.atomic_add(f, j, -f_lj)
 
 @wp.func
 def pow3(x: wp.Float) -> wp.Float:
