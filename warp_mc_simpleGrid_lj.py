@@ -61,9 +61,9 @@ def update_periodic(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=w
             x[pid][i] = LOWER_BOUNDARY[i] + LENGTH[i] - wp.mod(-dx[i], LENGTH[i])
             p[pid] -= wp.static(2.0 * MASS / DT) * v[pid][i]
     x[pid] = LOWER_BOUNDARY + wp.mod(x[pid] + OFFSET - LOWER_BOUNDARY, LENGTH)
-    i = wp.int(wp.floordiv(x[pid][0] - LOWER_BOUNDARY[0], GRID_CELL_SIZE))
-    j = wp.int(wp.floordiv(x[pid][1] - LOWER_BOUNDARY[1], GRID_CELL_SIZE))
-    k = wp.int(wp.floordiv(x[pid][2] - LOWER_BOUNDARY[2], GRID_CELL_SIZE))
+    i = int(wp.floordiv(x[pid][0] - LOWER_BOUNDARY[0], GRID_CELL_SIZE))
+    j = int(wp.floordiv(x[pid][1] - LOWER_BOUNDARY[1], GRID_CELL_SIZE))
+    k = int(wp.floordiv(x[pid][2] - LOWER_BOUNDARY[2], GRID_CELL_SIZE))
     i = wp.min(wp.max(i, 0), L_GRID - 1)
     j = wp.min(wp.max(j, 0), L_GRID - 1)
     k = wp.min(wp.max(k, 0), L_GRID - 1)
@@ -92,9 +92,9 @@ def update_bounce(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.
             else:
                 break
     x[pid] = LOWER_BOUNDARY + wp.mod(x[pid] + OFFSET - LOWER_BOUNDARY, LENGTH)
-    i = wp.int(wp.floordiv(x[pid][0] - LOWER_BOUNDARY[0], GRID_CELL_SIZE))
-    j = wp.int(wp.floordiv(x[pid][1] - LOWER_BOUNDARY[1], GRID_CELL_SIZE))
-    k = wp.int(wp.floordiv(x[pid][2] - LOWER_BOUNDARY[2], GRID_CELL_SIZE))
+    i = int(wp.floordiv(x[pid][0] - LOWER_BOUNDARY[0], GRID_CELL_SIZE))
+    j = int(wp.floordiv(x[pid][1] - LOWER_BOUNDARY[1], GRID_CELL_SIZE))
+    k = int(wp.floordiv(x[pid][2] - LOWER_BOUNDARY[2], GRID_CELL_SIZE))
     i = wp.min(wp.max(i, 0), L_GRID - 1)
     j = wp.min(wp.max(j, 0), L_GRID - 1)
     k = wp.min(wp.max(k, 0), L_GRID - 1)
@@ -103,7 +103,7 @@ def update_bounce(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.
     grid[gid * MAX_GRID_SIZE + subid] = pid
 
 @wp.func
-def scat22_o1(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3), v: wp.array(dtype=wp.vec3), f: wp.array(dtype=wp.vec3), seed: int, ib: int, jb: int, direction: int, period_offset: wp.vec3): # pyright: ignore[reportInvalidTypeForm]
+def scat22_o1(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3), v: wp.array(dtype=wp.vec3), f: wp.array(dtype=wp.vec3), seed: wp.int32, ib: int, jb: int, direction: int, period_offset: wp.vec3): # pyright: ignore[reportInvalidTypeForm]
     state = wp.rand_init(seed)
     for i0 in range(grid_sizes[ib]):
         i = grid[ib * MAX_GRID_SIZE + i0]
@@ -129,7 +129,7 @@ def scat22_o1(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int3
                     wp.atomic_add(v, j, dx * dv_dx / d2)
 
 @wp.func
-def scat22_o2(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3), v: wp.array(dtype=wp.vec3), f: wp.array(dtype=wp.vec3), seed: int, ib: int, jb: int, direction1: int, direction2: int, period_offset: wp.vec3): # pyright: ignore[reportInvalidTypeForm]
+def scat22_o2(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3), v: wp.array(dtype=wp.vec3), f: wp.array(dtype=wp.vec3), seed: wp.int32, ib: int, jb: int, direction1: int, direction2: int, period_offset: wp.vec3): # pyright: ignore[reportInvalidTypeForm]
     state = wp.rand_init(seed)
     for i0 in range(grid_sizes[ib]):
         i = grid[ib * MAX_GRID_SIZE + i0]
@@ -154,9 +154,9 @@ def scat22_o2(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int3
                     wp.atomic_add(v, j, dx * dv_dx / d2)
 
 @wp.kernel
-def update_collisions(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3), v: wp.array(dtype=wp.vec3), f: wp.array(dtype=wp.vec3), seed: int): # pyright: ignore[reportInvalidTypeForm]
+def update_collisions(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3), v: wp.array(dtype=wp.vec3), f: wp.array(dtype=wp.vec3), seed: wp.int32): # pyright: ignore[reportInvalidTypeForm]
     gid = wp.tid()
-    state = wp.rand_init(seed, gid)
+    state = wp.rand_init(seed, wp.int32(gid))
     for i0 in range(grid_sizes[gid]):
         i = grid[gid * MAX_GRID_SIZE + i0]
         for j0 in range(i0 + 1, grid_sizes[gid]):
@@ -212,15 +212,15 @@ def update_collisions(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype
                 wp.atomic_add(f, j, -f_lj)
 
 @wp.func
-def pow3(x: wp.Float) -> wp.Float:
+def pow3(x: wp.float32) -> wp.float32:
     return x * x * x
 
 @wp.func
-def pow4(x: wp.Float) -> wp.Float:
+def pow4(x: wp.float32) -> wp.float32:
     return x * x * x * x
 
 @wp.func
-def pow5(x: wp.Float) -> wp.Float:
+def pow5(x: wp.float32) -> wp.float32:
     return x * x * x * x * x
 
 @wp.kernel
@@ -230,7 +230,7 @@ def length_f(velocities: wp.array(dtype=wp.vec3), speeds: wp.array(dtype=float))
 @wp.kernel
 def sample_unit_sphere_surface(output: wp.array(dtype=wp.vec3)): # pyright: ignore[reportInvalidTypeForm]
     tid = wp.tid()
-    state = wp.rand_init(0, tid)
+    state = wp.rand_init(wp.int32(0), wp.int32(tid))
     output[tid] = wp.vec3(wp.sample_unit_sphere_surface(state))
 
 
