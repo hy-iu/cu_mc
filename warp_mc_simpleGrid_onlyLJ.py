@@ -8,6 +8,8 @@ import os
 import sys
 import shutil
 
+_0 = wp.float64(0.0)
+
 N = 131072
 RADIUS = 0.07
 LJ_EPSILON = 0.1
@@ -20,54 +22,55 @@ BY = -8.0
 BZ = -8.0
 N_TEST = 10
 
-LOWER_BOUNDARY = wp.vec3(BX, BY, BZ)
-LENGTH = wp.vec3(L, L, L)
-GRID_CELL_SIZE = L / L_GRID
-# OFFSET = wp.vec3(0.57, 0.57, 0.57)
-OFFSET = wp.vec3(0.5, 0.5, 0.5)
+LOWER_BOUNDARY = wp.vec3d(BX, BY, BZ)
+LENGTH = wp.vec3d(L, L, L)
+GRID_CELL_SIZE = wp.static(wp.float64(L / L_GRID))
+# OFFSET = wp.vec3d(0.57, 0.57, 0.57)
+OFFSET = wp.vec3d(0.5, 0.5, 0.5)
 NUM_GRIDS = L_GRID ** 3
 MAX_GRID_SIZE = (N // NUM_GRIDS) * 4
 # GridIndex = wp.vec(MAX_GRID_SIZE, dtype=wp.int32)
 
 DT = 0.01
-T_STOP = 100.0
+_DT = wp.static(wp.float64(DT))
+T_STOP = 10.0
 
 V_MAX = 1e5  # haven't used
 F_MAX = 1e5
-D2_MIN = RADIUS * RADIUS * 0.1
+D2_MIN = RADIUS * RADIUS * 0.01
 PERIODOC_MAX = 5
 
-OUTPUT_ROOT = 'warp_mc_simpleGrid_onlyLJ'
+OUTPUT_ROOT = 'output_onlyLJ'
 
 wp.init()
 
 @wp.func
-def lj_force(r2: wp.Float) -> wp.Float:
-    inv_r2 = wp.static(4.0 * RADIUS * RADIUS) / r2
+def lj_force(r2: wp.float64) -> wp.float64:
+    inv_r2 = wp.static(wp.float64(4.0 * RADIUS * RADIUS)) / r2
     inv_r6 = inv_r2 * inv_r2 * inv_r2
     inv_r12 = inv_r6 * inv_r6
-    f = 24.0 * LJ_EPSILON * (2.0 * inv_r12 - inv_r6) / r2
-    return f if f < wp.static(F_MAX) else 0.0
+    f = wp.static(wp.float64(24.0 * LJ_EPSILON)) * ((wp.static(wp.float64(2.0))) * inv_r12 - inv_r6) / r2
+    return f if f < wp.static(wp.float64(F_MAX)) else wp.float64(0.0)
 
 @wp.kernel
-def update_v_half_step(v: wp.array(dtype=wp.vec3), f: wp.array(dtype=wp.vec3)): # pyright: ignore[reportInvalidTypeForm]
+def update_v_half_step(v: wp.array(dtype=wp.vec3d), f: wp.array(dtype=wp.vec3d)): # pyright: ignore[reportInvalidTypeForm]
     pid = wp.tid()
-    v[pid] += f[pid] * wp.static(DT / (2.0 * MASS))
+    v[pid] += f[pid] * wp.static(wp.float64(DT / (2.0 * MASS)))
 
 @wp.kernel
-def update_periodic(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3), v: wp.array(dtype=wp.vec3), f: wp.array(dtype=wp.vec3), p: wp.array(dtype=float)): # pyright: ignore[reportInvalidTypeForm]
+def update_periodic(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3d), v: wp.array(dtype=wp.vec3d), f: wp.array(dtype=wp.vec3d), p: wp.array(dtype=wp.float64)): # pyright: ignore[reportInvalidTypeForm]
     pid = wp.tid()
-    x[pid] += v[pid] * DT
-    p[pid] = 0.0
+    x[pid] += v[pid] * _DT
+    p[pid] = _0
     for i in range(3):
         for _ in range(PERIODOC_MAX):
             dx = x[pid] - LOWER_BOUNDARY
             if dx[i] > LENGTH[i]:
                 x[pid][i] = LOWER_BOUNDARY[i] + wp.mod(dx[i], LENGTH[i])
-                p[pid] += wp.static(2.0 * MASS / DT) * v[pid][i]
-            elif dx[i] < 0.0:
+                p[pid] += wp.static(wp.float64(2.0 * MASS / DT)) * v[pid][i]
+            elif dx[i] < _0:
                 x[pid][i] = LOWER_BOUNDARY[i] + LENGTH[i] - wp.mod(-dx[i], LENGTH[i])
-                p[pid] -= wp.static(2.0 * MASS / DT) * v[pid][i]
+                p[pid] -= wp.static(wp.float64(2.0 * MASS / DT)) * v[pid][i]
             else:
                 break
     x[pid] = LOWER_BOUNDARY + wp.mod(x[pid] + OFFSET - LOWER_BOUNDARY, LENGTH)
@@ -82,22 +85,22 @@ def update_periodic(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=w
     grid[gid * MAX_GRID_SIZE + subid] = pid
 
 @wp.kernel
-def update_bounce(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3), v: wp.array(dtype=wp.vec3), f: wp.array(dtype=wp.vec3), p: wp.array(dtype=float)): # pyright: ignore[reportInvalidTypeForm]
+def update_bounce(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3d), v: wp.array(dtype=wp.vec3d), f: wp.array(dtype=wp.vec3d), p: wp.array(dtype=wp.float64)): # pyright: ignore[reportInvalidTypeForm]
     pid = wp.tid()
-    x[pid] += v[pid] * DT
-    p[pid] = 0.0
+    x[pid] += v[pid] * _DT
+    p[pid] = _0
     dx = x[pid] - LOWER_BOUNDARY
     for i in range(3):
         # while True:
         for _ in range(PERIODOC_MAX):
             dx = x[pid] - LOWER_BOUNDARY
             if dx[i] > LENGTH[i]:
-                x[pid][i] = LOWER_BOUNDARY[i] + 2.0 * LENGTH[i] - dx[i]
-                p[pid] += wp.static(2.0 * MASS / DT) * v[pid][i]
+                x[pid][i] = LOWER_BOUNDARY[i] + wp.static(wp.float64(2.0)) * LENGTH[i] - dx[i]
+                p[pid] += wp.static(wp.float64(2.0 * MASS / DT)) * v[pid][i]
                 v[pid][i] = -v[pid][i]
-            elif dx[i] < 0.0:
+            elif dx[i] < _0:
                 x[pid][i] = LOWER_BOUNDARY[i] - dx[i]
-                p[pid] -= wp.static(2.0 * MASS / DT) * v[pid][i]
+                p[pid] -= wp.static(wp.float64(2.0 * MASS / DT)) * v[pid][i]
                 v[pid][i] = -v[pid][i]
             else:
                 break
@@ -113,7 +116,7 @@ def update_bounce(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.
     grid[gid * MAX_GRID_SIZE + subid] = pid
 
 @wp.func
-def scat22_o1(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3), v: wp.array(dtype=wp.vec3), f: wp.array(dtype=wp.vec3), seed: int, ib: int, jb: int, direction: int, period_offset: wp.vec3): # pyright: ignore[reportInvalidTypeForm]
+def scat22_o1(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3d), v: wp.array(dtype=wp.vec3d), f: wp.array(dtype=wp.vec3d), seed: int, ib: int, jb: int, direction: int, period_offset: wp.vec3d): # pyright: ignore[reportInvalidTypeForm]
     state = wp.rand_init(seed)
     for i0 in range(grid_sizes[ib]):
         i = grid[ib * MAX_GRID_SIZE + i0]
@@ -132,7 +135,7 @@ def scat22_o1(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int3
 
 
 @wp.func
-def scat22_o2(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3), v: wp.array(dtype=wp.vec3), f: wp.array(dtype=wp.vec3), seed: int, ib: int, jb: int, direction1: int, direction2: int, period_offset: wp.vec3): # pyright: ignore[reportInvalidTypeForm]
+def scat22_o2(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3d), v: wp.array(dtype=wp.vec3d), f: wp.array(dtype=wp.vec3d), seed: int, ib: int, jb: int, direction1: int, direction2: int, period_offset: wp.vec3d): # pyright: ignore[reportInvalidTypeForm]
     state = wp.rand_init(seed)
     for i0 in range(grid_sizes[ib]):
         i = grid[ib * MAX_GRID_SIZE + i0]
@@ -150,7 +153,7 @@ def scat22_o2(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int3
             wp.atomic_add(f, j, -f_lj)
 
 @wp.kernel
-def update_collisions(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3), v: wp.array(dtype=wp.vec3), f: wp.array(dtype=wp.vec3), seed: int): # pyright: ignore[reportInvalidTypeForm]
+def update_collisions(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int32), x: wp.array(dtype=wp.vec3d), v: wp.array(dtype=wp.vec3d), f: wp.array(dtype=wp.vec3d), seed: int): # pyright: ignore[reportInvalidTypeForm]
     gid = wp.tid()
     state = wp.rand_init(seed, gid)
     for i0 in range(grid_sizes[gid]):
@@ -173,29 +176,29 @@ def update_collisions(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype
     jbx = ibx - 1 if ibx > 0 else L_GRID - 1
     jby = iby - 1 if iby > 0 else L_GRID - 1
     jbz = ibz - 1 if ibz > 0 else L_GRID - 1
-    xoff = 0.0 if ibx > 0 else LENGTH[0]
-    yoff = 0.0 if iby > 0 else LENGTH[1]
-    zoff = 0.0 if ibz > 0 else LENGTH[2]
-    scat22_o1(grid, grid_sizes, x, v, f, seed * 2 + gid, gid, jbx * L_GRID * L_GRID + iby * L_GRID + ibz, 0, wp.vec3(xoff, 0.0, 0.0))
-    scat22_o1(grid, grid_sizes, x, v, f, seed * 3 + gid, gid, ibx * L_GRID * L_GRID + jby * L_GRID + ibz, 1, wp.vec3(0.0, yoff, 0.0))
-    scat22_o1(grid, grid_sizes, x, v, f, seed * 4 + gid, gid, ibx * L_GRID * L_GRID + iby * L_GRID + jbz, 2, wp.vec3(0.0, 0.0, zoff))
+    xoff = _0 if ibx > 0 else LENGTH[0]
+    yoff = _0 if iby > 0 else LENGTH[1]
+    zoff = _0 if ibz > 0 else LENGTH[2]
+    scat22_o1(grid, grid_sizes, x, v, f, seed * 2 + gid, gid, jbx * L_GRID * L_GRID + iby * L_GRID + ibz, 0, wp.vec3d(xoff, _0, _0))
+    scat22_o1(grid, grid_sizes, x, v, f, seed * 3 + gid, gid, ibx * L_GRID * L_GRID + jby * L_GRID + ibz, 1, wp.vec3d(_0, yoff, _0))
+    scat22_o1(grid, grid_sizes, x, v, f, seed * 4 + gid, gid, ibx * L_GRID * L_GRID + iby * L_GRID + jbz, 2, wp.vec3d(_0, _0, zoff))
     jbx2 = ibx - 2 if ibx > 1 else L_GRID - 1
     jby2 = iby - 2 if iby > 1 else L_GRID - 1
     jbz2 = ibz - 2 if ibz > 1 else L_GRID - 1
-    xoff2 = 0.0 if ibx > 1 else LENGTH[0]
-    yoff2 = 0.0 if iby > 1 else LENGTH[1]
-    zoff2 = 0.0 if ibz > 1 else LENGTH[2]
-    scat22_o2(grid, grid_sizes, x, v, f, seed * 5 + gid, gid, jbx * L_GRID * L_GRID + jby * L_GRID + ibz, 0, 1, wp.vec3(xoff, yoff, 0.0))
-    scat22_o2(grid, grid_sizes, x, v, f, seed * 6 + gid, gid, jbx * L_GRID * L_GRID + iby * L_GRID + jbz, 0, 2, wp.vec3(xoff, 0.0, zoff))
-    scat22_o2(grid, grid_sizes, x, v, f, seed * 7 + gid, gid, ibx * L_GRID * L_GRID + jby * L_GRID + jbz, 1, 2, wp.vec3(0.0, yoff, zoff))
-    scat22_o2(grid, grid_sizes, x, v, f, seed * 8 + gid, gid, jbx2 * L_GRID * L_GRID + iby * L_GRID + ibz, 0, 0, wp.vec3(xoff2, 0.0, 0.0))
-    scat22_o2(grid, grid_sizes, x, v, f, seed * 9 + gid, gid, ibx * L_GRID * L_GRID + jby2 * L_GRID + ibz, 1, 1, wp.vec3(0.0, yoff2, 0.0))
-    scat22_o2(grid, grid_sizes, x, v, f, seed * 10 + gid, gid, ibx * L_GRID * L_GRID + iby * L_GRID + jbz2, 2, 2, wp.vec3(0.0, 0.0, zoff2))
+    xoff2 = _0 if ibx > 1 else LENGTH[0]
+    yoff2 = _0 if iby > 1 else LENGTH[1]
+    zoff2 = _0 if ibz > 1 else LENGTH[2]
+    scat22_o2(grid, grid_sizes, x, v, f, seed * 5 + gid, gid, jbx * L_GRID * L_GRID + jby * L_GRID + ibz, 0, 1, wp.vec3d(xoff, yoff, _0))
+    scat22_o2(grid, grid_sizes, x, v, f, seed * 6 + gid, gid, jbx * L_GRID * L_GRID + iby * L_GRID + jbz, 0, 2, wp.vec3d(xoff, _0, zoff))
+    scat22_o2(grid, grid_sizes, x, v, f, seed * 7 + gid, gid, ibx * L_GRID * L_GRID + jby * L_GRID + jbz, 1, 2, wp.vec3d(_0, yoff, zoff))
+    scat22_o2(grid, grid_sizes, x, v, f, seed * 8 + gid, gid, jbx2 * L_GRID * L_GRID + iby * L_GRID + ibz, 0, 0, wp.vec3d(xoff2, _0, _0))
+    scat22_o2(grid, grid_sizes, x, v, f, seed * 9 + gid, gid, ibx * L_GRID * L_GRID + jby2 * L_GRID + ibz, 1, 1, wp.vec3d(_0, yoff2, _0))
+    scat22_o2(grid, grid_sizes, x, v, f, seed * 10 + gid, gid, ibx * L_GRID * L_GRID + iby * L_GRID + jbz2, 2, 2, wp.vec3d(_0, _0, zoff2))
     for i0 in range(grid_sizes[gid]):
         i = grid[gid * MAX_GRID_SIZE + i0]
         for j0 in range(grid_sizes[jbx * L_GRID * L_GRID + jby * L_GRID + jbz]):
             j = grid[(gid + 1 if gid + 1 < NUM_GRIDS else 0) * MAX_GRID_SIZE + j0]
-            dx = x[i] - x[j] + wp.vec3(xoff, yoff, zoff)
+            dx = x[i] - x[j] + wp.vec3d(xoff, yoff, zoff)
             d2 = wp.length_sq(dx)
             # if d2 > wp.static(4.0 * RADIUS * RADIUS):
             f_lj = lj_force(d2) * dx
@@ -215,25 +218,25 @@ def pow5(x: wp.Float) -> wp.Float:
     return x * x * x * x * x
 
 @wp.kernel
-def length_f(velocities: wp.array(dtype=wp.vec3), speeds: wp.array(dtype=float)): # pyright: ignore[reportInvalidTypeForm]
+def length_f(velocities: wp.array(dtype=wp.vec3d), speeds: wp.array(dtype=wp.float64)): # pyright: ignore[reportInvalidTypeForm]
     speeds[wp.tid()] = wp.length(velocities[wp.tid()])
 
 @wp.kernel
-def sample_unit_sphere_surface(output: wp.array(dtype=wp.vec3)): # pyright: ignore[reportInvalidTypeForm]
+def sample_unit_sphere_surface(output: wp.array(dtype=wp.vec3d)): # pyright: ignore[reportInvalidTypeForm]
     tid = wp.tid()
     state = wp.rand_init(0, tid)
-    output[tid] = wp.vec3(wp.sample_unit_sphere_surface(state))
-
+    sampled = wp.sample_unit_sphere_surface(state)
+    output[tid] = wp.vec3d(wp.float64(sampled.x), wp.float64(sampled.y), wp.float64(sampled.z))
 
 def create_particle_volume(
     num_particles: int,
-    lower: wp.vec3,
-    higher: wp.vec3,
-) -> wp.array(dtype=wp.vec3): # pyright: ignore[reportInvalidTypeForm]
+    lower: wp.vec3d,
+    higher: wp.vec3d,
+) -> wp.array(dtype=wp.vec3d): # pyright: ignore[reportInvalidTypeForm]
     v = higher - lower
     points = np.random.rand(num_particles, 3) * v + lower
     print(f"N={num_particles}, n={num_particles / v[0] / v[1] / v[2]:.2f}")
-    return wp.array(points, dtype=wp.vec3)
+    return wp.array(points, dtype=wp.vec3d)
 
 def plot_pos(points, filename):
     plt.figure(figsize=(16, 12))
@@ -251,20 +254,19 @@ class ParticleSystem:
         print(f"RADIUS={RADIUS}, epsilon={LJ_EPSILON}, L={L}, L_GRID={L_GRID}, GRID_CELL_SIZE={GRID_CELL_SIZE}, MAX_GRID_SIZE={MAX_GRID_SIZE}, NUM_GRIDS={NUM_GRIDS}")
         print(f"MASS={MASS}, T={TEMPERATURE}, dt={DT}, N_test={N_TEST}, t_stop={T_STOP}")
         self.points = create_particle_volume(N, LOWER_BOUNDARY, LOWER_BOUNDARY + LENGTH)
-        self.velocities = wp.empty_like(self.points)
+        self.velocities = wp.zeros(N, dtype=wp.vec3d)
         wp.launch(
             kernel=sample_unit_sphere_surface,
-            dim=self.points.shape,
+            dim=self.velocities.shape,
             inputs=[self.velocities],
         )
         wp.synchronize()
-        self.velocities *= float(np.sqrt(TEMPERATURE / MASS * 3))
-        self.speeds = wp.zeros(N, dtype=float)
+        self.velocities *= wp.float64(np.sqrt(TEMPERATURE / MASS * 3))
+        self.speeds = wp.zeros(N, dtype=wp.float64)
         wp.launch(kernel=length_f, dim=self.points.shape, inputs=[self.velocities, self.speeds])
         wp.synchronize()
         self.forces = wp.empty_like(self.points)
-        self.bounded_pressures = wp.zeros(N, dtype=float)
-
+        self.bounded_pressures = wp.zeros(N, dtype=wp.float64)
         self.grid = wp.array(shape=NUM_GRIDS*MAX_GRID_SIZE, dtype=wp.int32)
         self.grid_sizes = wp.zeros(NUM_GRIDS, dtype=wp.int32)
 
@@ -337,7 +339,7 @@ class ParticleSystem:
                 # print('\r', float(v2_torch.mean()), float(v2_torch.min()), float(v2_torch.max()), end='')
                 mean_v2.append((wp.to_torch(self.speeds) ** 2).mean())
                 # supply energy
-                self.velocities *= float(np.sqrt(TEMPERATURE / MASS * 3 / mean_v2[-1].item()))
+                self.velocities *= wp.float64(np.sqrt(TEMPERATURE / MASS * 3 / mean_v2[-1].item()))  # TODO: themoral control algorithms
                 pooled_pressures.append(pressure[pre_i:i+1].mean())
                 pre_i = i
             i += 1
