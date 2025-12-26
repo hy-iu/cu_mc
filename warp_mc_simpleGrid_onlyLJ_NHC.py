@@ -78,7 +78,8 @@ def length_sq(v: wp.array(dtype=wp.vec3d), output: wp.array(dtype=wp.float64)): 
 
 class NHCChainThermostat:
     def __init__(self):
-        self._kT = np.float64(_kT)
+        # self._kT = np.float64(_kT)
+        self._kT = np.float64(0.5)
         self.Q = np.zeros(NHC_M_CHAIN, dtype=np.float64)
         self.Q[0] = np.float64(3 * N * NHC_T_DAMP * NHC_T_DAMP) * self._kT
         self.Q[1:] = np.float64(NHC_T_DAMP * NHC_T_DAMP) * self._kT
