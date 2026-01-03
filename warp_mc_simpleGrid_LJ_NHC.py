@@ -24,7 +24,11 @@ N_TEST = 10
 
 LOWER_BOUNDARY = wp.vec3d(BX, BY, BZ)
 LENGTH = wp.vec3d(L, L, L)
-GRID_CELL_SIZE = wp.static(wp.float64(L / L_GRID))
+GRID_CELL_SIZE: wp.float64 = wp.static(wp.float64(L / L_GRID))
+G2 = float(GRID_CELL_SIZE * GRID_CELL_SIZE)
+G3 = G2 * float(GRID_CELL_SIZE)
+G4 = G2 * G2
+G5 = G3 * G2
 # OFFSET = wp.vec3d(0.57, 0.57, 0.57)
 OFFSET = wp.vec3d(0.5, 0.5, 0.5)
 NUM_GRIDS = L_GRID ** 3
@@ -35,7 +39,7 @@ _kT = wp.static(wp.float64(TEMPERATURE))  # k_B = 1
 
 DT = 0.001
 _DT = wp.static(wp.float64(DT))
-T_STOP = 10.0
+T_STOP = 100.0
 
 NHC_N_LOOP = 1
 NHC_M_CHAIN = 4
@@ -78,8 +82,7 @@ def length_sq(v: wp.array(dtype=wp.vec3d), output: wp.array(dtype=wp.float64)): 
 
 class NHCChainThermostat:
     def __init__(self):
-        # self._kT = np.float64(_kT)
-        self._kT = np.float64(0.5)
+        self._kT = np.float64(_kT)
         self.Q = np.zeros(NHC_M_CHAIN, dtype=np.float64)
         self.Q[0] = np.float64(3 * N * NHC_T_DAMP * NHC_T_DAMP) * self._kT
         self.Q[1:] = np.float64(NHC_T_DAMP * NHC_T_DAMP) * self._kT
@@ -100,7 +103,7 @@ class NHCChainThermostat:
     
     def _integrate_p_eta_j(self, v: wp.array(dtype=wp.vec3d), j: int, delta2: wp.float64, delta4: wp.float64): # pyright: ignore[reportInvalidTypeForm]
         if j < NHC_M_CHAIN - 1:
-            self.p_eta[j] *= np.exp(-delta4 * self.eta[j + 1] / self.Q[j + 1])
+            self.p_eta[j] *= np.exp(-delta4 * self.p_eta[j + 1] / self.Q[j + 1])
         if j == 0:
             v_sq = wp.zeros(N, dtype=wp.float64)
             wp.launch(
@@ -194,7 +197,7 @@ def scat22_o1(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int3
                 continue
             dspeed = wp.length(dv)
             dist = wp.length(dx)
-            if wp.randf(state) < dx[direction] / dist * dspeed * wp.static(DT * wp.pi * 4.0 * RADIUS * RADIUS * RADIUS / (GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE) / float(N_TEST)):
+            if wp.randf(state) < wp.float64(wp.float64(dx[direction] / dist) * dspeed) * wp.static(wp.float64(DT * wp.pi * 4.0 * RADIUS * RADIUS * RADIUS / G4 / float(N_TEST))):
                 if dv_dx < 0.0:
                     wp.atomic_add(v, i, - dx * dv_dx / d2)
                     wp.atomic_add(v, j, dx * dv_dx / d2)
@@ -219,7 +222,7 @@ def scat22_o2(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype=wp.int3
             if dv_dx > 0.0:
                 continue
             dspeed = wp.length(dv)
-            if wp.randf(state) < dx[direction1] * dx[direction2] / d2 * dspeed * wp.static(DT * wp.pi * 2.0 * RADIUS * RADIUS * RADIUS * RADIUS / (GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE) / float(N_TEST)):
+            if wp.randf(state) < wp.float64(wp.float64(dx[direction1] * dx[direction2] / d2) * dspeed) * wp.static(wp.float64(DT * wp.pi * 2.0 * RADIUS * RADIUS * RADIUS * RADIUS / G5 / float(N_TEST))):
                 if dv_dx < 0.0:
                     wp.atomic_add(v, i, - dx * dv_dx / d2)
                     wp.atomic_add(v, j, dx * dv_dx / d2)
@@ -242,7 +245,8 @@ def update_collisions(grid: wp.array(dtype=wp.int32), grid_sizes: wp.array(dtype
                 wp.atomic_add(f, j, -f_lj)
             dv = v[i] - v[j]
             dspeed = wp.length(dv)
-            if wp.randf(state) < dspeed * wp.static(DT * wp.pi * 4.0 * RADIUS * RADIUS / (GRID_CELL_SIZE * GRID_CELL_SIZE * GRID_CELL_SIZE) / float(N_TEST)):
+            a = wp.static(wp.float64(DT * 4.0 * RADIUS * RADIUS * wp.pi / float(G3) / float(N_TEST)))
+            if wp.randf(state) < wp.float64(dspeed) * a:
                 dv_dx = wp.dot(dv, dx)
                 if dv_dx < 0.0:
                     wp.atomic_add(v, i, - dx * dv_dx / d2)
